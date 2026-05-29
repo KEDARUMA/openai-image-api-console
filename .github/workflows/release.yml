@@ -67,4 +67,5 @@ jobs:
           releaseBody: Download the installer or package for your OS from the assets below.
           releaseDraft: false
           prerelease: false
+          tauriScript: npx tauri
           args: ${{ matrix.args }}

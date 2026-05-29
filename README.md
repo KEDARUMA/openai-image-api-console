@@ -20,11 +20,17 @@ It is built with Tauri, React, and Vite, and can be built as a desktop app for m
 
 ## Screenshots
 
-The README is expected to include the following screenshots.
+### Main Screen
 
-- Main screen: generation form, preview, and history
-- Settings screen: API key field, language selector, API Keys / Billing buttons
-- Image editing screen: input image, mask UI, and preview
+![Main screen](docs/images/main-screen.png)
+
+### Settings Screen
+
+![Settings screen](docs/images/settings-screen.png)
+
+### Edit with Mask
+
+![Edit with Mask](docs/images/edit-with-mask.png)
 
 ## Requirements
 

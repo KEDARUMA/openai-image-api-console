@@ -1,6 +1,14 @@
-import { DragEvent, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { invoke as tauriInvoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import {
+  DragEvent,
+  PointerEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import appIcon from "./assets/app-icon.png";
 import {
   Brush,
   ChevronDown,
@@ -11,7 +19,6 @@ import {
   FileText,
   History,
   Image as ImageIcon,
-  Loader2,
   Play,
   Save,
   Settings,
@@ -19,14 +26,14 @@ import {
   Trash2,
   Upload,
   X,
-} from 'lucide-react';
+} from "lucide-react";
 
 type AppSettings = {
   apiKey: string;
   language: string;
 };
 
-type WorkMode = 'text' | 'image' | 'edit-mask';
+type WorkMode = "text" | "image" | "edit-mask";
 
 type GenerateForm = {
   mode: WorkMode;
@@ -51,7 +58,7 @@ type ImageAsset = {
   mimeType: string;
   dataUrl: string;
   path?: string;
-  maskEncoding?: 'api-alpha' | 'ui-red';
+  maskEncoding?: "api-alpha" | "ui-red";
   width?: number;
   height?: number;
 };
@@ -80,7 +87,7 @@ type HistoryItem = {
 };
 
 type AppConfig = {
-  defaults: Omit<GenerateForm, 'inputImages' | 'maskImage'>;
+  defaults: Omit<GenerateForm, "inputImages" | "maskImage">;
   limits: {
     history: number;
     countMin: number;
@@ -119,102 +126,112 @@ type GenerationProgress = {
   total: number;
 };
 
-const historyKey = 'openai-image-api.history.v1';
-const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+const historyKey = "openai-image-api.history.v1";
+const isTauri =
+  typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 const backendTimeoutMs = 180_000;
 const backendWaitLogMs = [60_000, 120_000];
 const fallbackLocale: LocaleText = {
-  'meta.name': 'English',
-  'app.title': 'OpenAI Image API Console',
-  'app.subtitle': 'Responses API image_generation desktop console',
-  'button.settings': 'Settings',
-  'section.composer': 'Generation Settings',
-  'section.preview': 'Preview',
-  'section.history': 'History',
-  'section.debug': 'Debug Log',
-  'tab.text': 'Text to Image',
-  'tab.image': 'Image to Image',
-  'tab.edit-mask': 'Edit with Mask',
-  'field.prompt': 'Prompt',
-  'field.prompt.placeholder': 'Describe the image you want to generate or edit.',
-  'field.uploadImages': 'Drop images here, click to choose files, or paste from clipboard.',
-  'field.model': 'Model',
-  'field.size': 'Size',
-  'field.quality': 'Quality',
-  'field.format': 'Format',
-  'field.background': 'Background',
-  'field.moderation': 'Moderation',
-  'field.compression': 'Compression {value}%',
-  'field.compression.disabled': 'Compression disabled for PNG',
-  'field.count': 'Count {value}',
-  'field.language': 'Language',
-  'field.apiKey': 'OpenAI API Key',
-  'field.apiKey.placeholder': 'Paste your API key here.',
-  'action.generate': 'Generate',
-  'action.generating': 'Generate',
-  'action.generatingProgress': 'Generate [{current}/{total}]',
-  'action.finder': 'Show in Folder',
-  'action.saveAs': 'Save As',
-  'action.copy': 'Copy',
-  'action.copyError': 'Copy Error',
-  'action.copyLogs': 'Copy logs',
-  'action.clearLogs': 'Clear logs',
-  'action.openLogs': 'Open logs',
-  'action.closeLogs': 'Close logs',
-  'action.openBilling': 'Billing',
-  'action.openApiKeys': 'API Keys',
-  'action.close': 'Close',
-  'action.save': 'Save',
-  'action.loadMask': 'Load Mask',
-  'action.clear': 'Clear',
-  'empty.preview': 'Generated images will appear here.',
-  'empty.history': 'No history yet.',
-  'empty.logs': 'No logs yet.',
-  'status.tauriOnly': 'API key storage and image generation are available inside the Tauri app.',
-  'status.settingsSaved': 'Settings saved.',
-  'status.generating': 'Generating...',
-  'status.savedImages': 'Saved {count} image(s) to {path}.',
-  'status.pastedImages': 'Pasted {count} image(s) from clipboard.',
-  'status.copiedImage': 'Copied image data to clipboard.',
-  'status.copiedError': 'Copied error details to clipboard.',
-  'status.savedAs': 'Saved As: {path}',
-  'status.loadedHistory': 'Loaded settings and images from history.',
-  'status.waitingBackend': 'Still waiting for backend response after {seconds}s. Do not click Generate again.',
-  'error.backendTimeout': 'Backend response timeout after {seconds}s.',
-  'message.needInputImage': 'Add an input image.',
-  'message.needMaskImage': 'Load a mask image or draw one with the brush.',
-  'message.addInputFirst': 'Add an input image first.',
-  'message.maskSizeMismatch': 'Mask size must match input image size. Input: {inputWidth}x{inputHeight}, mask: {maskWidth}x{maskHeight}.',
-  'modal.error.title': 'Image generation failed',
-  'modal.settings.title': 'Settings',
-  'aria.settings': 'Settings',
-  'aria.composer': 'Generation settings',
-  'aria.preview': 'Preview',
-  'aria.history': 'History',
-  'aria.debug': 'Debug log',
-  'aria.modeTabs': 'Generation mode',
-  'aria.error': 'Image generation error',
-  'title.close': 'Close',
-  'title.delete': 'Delete',
-  'title.finder': 'Show in Folder',
-  'title.saveAs': 'Save as',
-  'title.copyImage': 'Copy image',
-  'error.tauriOnly': 'Run this inside the Tauri app.',
+  "meta.name": "English",
+  "app.title": "OpenAI Image API Console",
+  "app.subtitle": "Responses API image_generation desktop console",
+  "button.settings": "Settings",
+  "section.composer": "Generation Settings",
+  "section.preview": "Preview",
+  "section.history": "History",
+  "section.debug": "Debug Log",
+  "tab.text": "Text to Image",
+  "tab.image": "Image to Image",
+  "tab.edit-mask": "Edit with Mask",
+  "field.prompt": "Prompt",
+  "field.prompt.placeholder":
+    "Describe the image you want to generate or edit.",
+  "field.uploadImages":
+    "Drop images here, click to choose files, or paste from clipboard.",
+  "field.model": "Model",
+  "field.size": "Size",
+  "field.quality": "Quality",
+  "field.format": "Format",
+  "field.background": "Background",
+  "field.moderation": "Moderation",
+  "field.compression": "Compression {value}%",
+  "field.compression.disabled": "Compression disabled for PNG",
+  "field.count": "Count {value}",
+  "field.language": "Language",
+  "field.apiKey": "OpenAI API Key",
+  "field.apiKey.placeholder": "Paste your API key here.",
+  "action.generate": "Generate",
+  "action.generating": "Generate",
+  "action.generatingProgress": "Generate [{current}/{total}]",
+  "action.stop": "Stop",
+  "action.finder": "Show in Folder",
+  "action.saveAs": "Save As",
+  "action.copy": "Copy",
+  "action.copyError": "Copy Error",
+  "action.copyLogs": "Copy logs",
+  "action.clearLogs": "Clear logs",
+  "action.openLogs": "Open logs",
+  "action.closeLogs": "Close logs",
+  "action.openBilling": "Billing",
+  "action.openApiKeys": "API Keys",
+  "action.close": "Close",
+  "action.save": "Save",
+  "action.createBlankCanvas": "Blank 1024x1024",
+  "action.loadMask": "Load Mask",
+  "action.clear": "Clear",
+  "empty.preview": "Generated images will appear here.",
+  "empty.history": "No history yet.",
+  "empty.logs": "No logs yet.",
+  "status.tauriOnly":
+    "API key storage and image generation are available inside the Tauri app.",
+  "status.settingsSaved": "Settings saved.",
+  "status.generating": "Generating...",
+  "status.cancelled":
+    "Generation stopped. Backend response will be ignored if it arrives later.",
+  "status.savedImages": "Saved {count} image(s) to {path}.",
+  "status.pastedImages": "Pasted {count} image(s) from clipboard.",
+  "status.copiedImage": "Copied image data to clipboard.",
+  "status.copiedError": "Copied error details to clipboard.",
+  "status.savedAs": "Saved As: {path}",
+  "status.loadedHistory": "Loaded settings and images from history.",
+  "status.waitingBackend":
+    "Still waiting for backend response after {seconds}s. Do not click Generate again.",
+  "error.backendTimeout": "Backend response timeout after {seconds}s.",
+  "message.needInputImage": "Add an input image.",
+  "message.needMaskImage": "Load a mask image or draw one with the brush.",
+  "message.addInputFirst": "Add an input image first.",
+  "message.maskSizeMismatch":
+    "Mask size must match input image size. Input: {inputWidth}x{inputHeight}, mask: {maskWidth}x{maskHeight}.",
+  "modal.error.title": "Image generation failed",
+  "modal.settings.title": "Settings",
+  "aria.settings": "Settings",
+  "aria.composer": "Generation settings",
+  "aria.preview": "Preview",
+  "aria.history": "History",
+  "aria.debug": "Debug log",
+  "aria.modeTabs": "Generation mode",
+  "aria.error": "Image generation error",
+  "title.close": "Close",
+  "title.delete": "Delete",
+  "title.finder": "Show in Folder",
+  "title.saveAs": "Save as",
+  "title.copyImage": "Copy image",
+  "error.tauriOnly": "Run this inside the Tauri app.",
 };
 
 const fallbackAppConfig: AppConfig = {
   defaults: {
-    mode: 'text',
-    model: 'gpt-5.4-mini',
-    prompt: '',
-    filename: 'openai-image',
-    size: 'auto',
-    quality: 'high',
-    outputFormat: 'png',
+    mode: "text",
+    model: "gpt-5.4-mini",
+    prompt: "",
+    filename: "openai-image",
+    size: "auto",
+    quality: "high",
+    outputFormat: "png",
     outputCompression: 90,
-    background: 'transparent',
-    moderation: 'auto',
-    action: 'generate',
+    background: "transparent",
+    moderation: "auto",
+    action: "generate",
     count: 1,
   },
   limits: {
@@ -225,65 +242,90 @@ const fallbackAppConfig: AppConfig = {
     outputCompressionMax: 100,
     requestDelayMs: 3000,
   },
-  modes: ['text', 'image', 'edit-mask'],
+  modes: ["text", "image", "edit-mask"],
   models: [
-    { value: 'gpt-5.5', label: 'gpt-5.5 ($5.00 / $30.00)' },
-    { value: 'gpt-5.2', label: 'gpt-5.2 ($1.75 / $14.00)' },
-    { value: 'gpt-5.4-mini', label: 'gpt-5.4-mini ($0.75 / $4.50)' },
-    { value: 'gpt-5.4-nano', label: 'gpt-5.4-nano ($0.20 / $1.25)' },
-    { value: 'gpt-5-nano', label: 'gpt-5-nano ($0.05 / $0.40)' },
+    { value: "gpt-5.5", label: "gpt-5.5 ($5.00 / $30.00)" },
+    { value: "gpt-5.2", label: "gpt-5.2 ($1.75 / $14.00)" },
+    { value: "gpt-5.4-mini", label: "gpt-5.4-mini ($0.75 / $4.50)" },
+    { value: "gpt-5.4-nano", label: "gpt-5.4-nano ($0.20 / $1.25)" },
+    { value: "gpt-5-nano", label: "gpt-5-nano ($0.05 / $0.40)" },
   ],
   imageEditModels: [
-    { value: 'gpt-image-2', label: 'gpt-image-2 ($8.00 / $30.00)' },
-    { value: 'gpt-image-1.5', label: 'gpt-image-1.5 ($8.00 / $32.00)' },
-    { value: 'gpt-image-1', label: 'gpt-image-1 ($10.00 / $40.00)' },
-    { value: 'gpt-image-1-mini', label: 'gpt-image-1-mini ($2.50 / $8.00)' },
-    { value: 'chatgpt-image-latest', label: 'chatgpt-image-latest ($8.00 / $32.00)' },
+    { value: "gpt-image-2", label: "gpt-image-2 ($8.00 / $30.00)" },
+    { value: "gpt-image-1.5", label: "gpt-image-1.5 ($8.00 / $32.00)" },
+    { value: "gpt-image-1", label: "gpt-image-1 ($10.00 / $40.00)" },
+    { value: "gpt-image-1-mini", label: "gpt-image-1-mini ($2.50 / $8.00)" },
+    {
+      value: "chatgpt-image-latest",
+      label: "chatgpt-image-latest ($8.00 / $32.00)",
+    },
   ],
-  sizes: ['auto', '1024x1024', '1024x1536', '1536x1024'],
-  qualities: ['auto', 'low', 'medium', 'high'],
-  outputFormats: ['png', 'webp', 'jpeg'],
-  backgrounds: ['auto', 'transparent', 'opaque'],
-  moderations: ['auto', 'low'],
+  sizes: ["auto", "1024x1024", "1024x1536", "1536x1024"],
+  qualities: ["auto", "low", "medium", "high"],
+  outputFormats: ["png", "webp", "jpeg"],
+  backgrounds: ["auto", "transparent", "opaque"],
+  moderations: ["auto", "low"],
 };
 
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>({ apiKey: '', language: 'en' });
+  const [settings, setSettings] = useState<AppSettings>({
+    apiKey: "",
+    language: "en",
+  });
   const [appConfig, setAppConfig] = useState<AppConfig>(fallbackAppConfig);
   const [locale, setLocale] = useState<LocaleText>(fallbackLocale);
-  const [availableLocales, setAvailableLocales] = useState<LocaleInfo[]>([{ code: 'en', name: 'English' }]);
-  const [outputDir, setOutputDir] = useState('/Users/pooh/Pictures/OpenAI Image API Console');
-  const [form, setForm] = useState<GenerateForm>(() => buildInitialForm(fallbackAppConfig));
+  const [availableLocales, setAvailableLocales] = useState<LocaleInfo[]>([
+    { code: "en", name: "English" },
+  ]);
+  const [outputDir, setOutputDir] = useState(
+    "/Users/pooh/Pictures/OpenAI Image API Console",
+  );
+  const [form, setForm] = useState<GenerateForm>(() =>
+    buildInitialForm(fallbackAppConfig),
+  );
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
-  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [brushSize, setBrushSize] = useState(44);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [debugOpen, setDebugOpen] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; image: GeneratedImage } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    image: GeneratedImage;
+  } | null>(null);
   const [historyReady, setHistoryReady] = useState(false);
   const [errorDialog, setErrorDialog] = useState<string | null>(null);
-  const [generationProgress, setGenerationProgress] = useState<GenerationProgress | null>(null);
+  const [generationProgress, setGenerationProgress] =
+    useState<GenerationProgress | null>(null);
   const composerRef = useRef<HTMLElement | null>(null);
+  const generationRunIdRef = useRef(0);
+  const cancelledRunIdsRef = useRef<Set<number>>(new Set());
+  const backendWaitTimersRef = useRef<number[]>([]);
 
-  const canCompress = form.outputFormat === 'jpeg' || form.outputFormat === 'webp';
+  const canCompress =
+    form.outputFormat === "jpeg" || form.outputFormat === "webp";
   const historyLimit = appConfig.limits.history;
   const tabs = useMemo(
-    () => appConfig.modes.map((id) => ({ id, label: translate(locale, `tab.${id}`) })),
+    () =>
+      appConfig.modes.map((id) => ({
+        id,
+        label: translate(locale, `tab.${id}`),
+      })),
     [appConfig.modes, locale],
   );
   const selectedHistory = useMemo(
     () => history.find((item) => item.id === selectedHistoryId) ?? null,
     [history, selectedHistoryId],
   );
-  const buttonLabel = busy && generationProgress
-    ? translate(locale, 'action.generatingProgress', generationProgress)
-    : busy
-      ? translate(locale, 'action.generating')
-      : translate(locale, 'action.generate');
+  const buttonLabel = busy
+    ? translate(locale, "action.stop")
+    : translate(locale, "action.generate");
 
   function t(key: string, replacements?: Record<string, string | number>) {
     return translate(locale, key, replacements);
@@ -293,19 +335,28 @@ function App() {
     const normalizedConfig = normalizeAppConfig(bundle.config);
     setAppConfig(normalizedConfig);
     setLocale({ ...fallbackLocale, ...bundle.locale });
-    setAvailableLocales(bundle.availableLocales.length > 0 ? bundle.availableLocales : [{ code: 'en', name: 'English' }]);
+    setAvailableLocales(
+      bundle.availableLocales.length > 0
+        ? bundle.availableLocales
+        : [{ code: "en", name: "English" }],
+    );
     setOutputDir(bundle.outputDir);
-    setForm((current) => normalizeFormAgainstConfig({
-      ...buildInitialForm(normalizedConfig),
-      prompt: current.prompt,
-      inputImages: current.inputImages,
-      maskImage: current.maskImage,
-    }, normalizedConfig));
+    setForm((current) =>
+      normalizeFormAgainstConfig(
+        {
+          ...buildInitialForm(normalizedConfig),
+          prompt: current.prompt,
+          inputImages: current.inputImages,
+          maskImage: current.maskImage,
+        },
+        normalizedConfig,
+      ),
+    );
   }
 
   function notifyError(error: unknown) {
     const errorText = formatErrorText(error);
-    setMessage(errorText.split('\n')[0] || errorText);
+    setMessage(errorText.split("\n")[0] || errorText);
     setErrorDialog(errorText);
     return errorText;
   }
@@ -317,21 +368,26 @@ function App() {
     let disposed = false;
 
     if (isTauri) {
-      tauriInvoke<AppSettings>('load_settings')
+      tauriInvoke<AppSettings>("load_settings")
         .then(async (value) => {
           const nextSettings = normalizeSettings(value);
           setSettings(nextSettings);
-          const bundle = await tauriInvoke<RuntimeConfigBundle>('load_runtime_config', { language: nextSettings.language });
+          const bundle = await tauriInvoke<RuntimeConfigBundle>(
+            "load_runtime_config",
+            { language: nextSettings.language },
+          );
           applyRuntimeBundle(bundle);
           const normalizedConfig = normalizeAppConfig(bundle.config);
-          const items = await tauriInvoke<HistoryItem[]>('load_history');
-          const normalizedItems = items.map((item) => normalizeStoredHistoryItem(item, normalizedConfig)).slice(0, normalizedConfig.limits.history);
+          const items = await tauriInvoke<HistoryItem[]>("load_history");
+          const normalizedItems = items
+            .map((item) => normalizeStoredHistoryItem(item, normalizedConfig))
+            .slice(0, normalizedConfig.limits.history);
           setHistory(await loadHistoryImages(normalizedItems));
           window.localStorage.removeItem(historyKey);
         })
         .catch((error) => notifyError(error))
         .finally(() => setHistoryReady(true));
-      listen<string>('debug-log', (event) => {
+      listen<string>("debug-log", (event) => {
         setDebugLogs((current) => [...current, event.payload]);
       })
         .then((unlisten) => {
@@ -342,7 +398,7 @@ function App() {
           removeDebugLogListener = unlisten;
         })
         .catch((error) => notifyError(error));
-      listen<GenerationProgress>('generation-progress', (event) => {
+      listen<GenerationProgress>("generation-progress", (event) => {
         setGenerationProgress(event.payload);
       })
         .then((unlisten) => {
@@ -353,7 +409,14 @@ function App() {
           removeProgressListener = unlisten;
         })
         .catch((error) => notifyError(error));
-      listen<GeneratedImage>('generated-image', (event) => {
+      listen<GeneratedImage>("generated-image", (event) => {
+        if (cancelledRunIdsRef.current.size > 0) {
+          setDebugLogs((current) => [
+            ...current,
+            `frontend: generated-image event received after stop; ignored path=${event.payload.path}`,
+          ]);
+          return;
+        }
         setImages((current) => appendUniqueImage(current, event.payload));
       })
         .then((unlisten) => {
@@ -365,7 +428,7 @@ function App() {
         })
         .catch((error) => notifyError(error));
     } else {
-      setMessage(translate(fallbackLocale, 'status.tauriOnly'));
+      setMessage(translate(fallbackLocale, "status.tauriOnly"));
       setHistoryReady(true);
     }
 
@@ -382,13 +445,14 @@ function App() {
       return;
     }
 
-    tauriInvoke('save_history', { history: history.slice(0, historyLimit).map(stripHistoryItemForStorage) })
-      .catch((error) => {
-        setDebugLogs((current) => [
-          ...current,
-          `frontend: history persistence skipped=${String(error)}`,
-        ]);
-      });
+    tauriInvoke("save_history", {
+      history: history.slice(0, historyLimit).map(stripHistoryItemForStorage),
+    }).catch((error) => {
+      setDebugLogs((current) => [
+        ...current,
+        `frontend: history persistence skipped=${String(error)}`,
+      ]);
+    });
   }, [history, historyReady]);
 
   useEffect(() => {
@@ -396,7 +460,7 @@ function App() {
   }, [form.mode]);
 
   useEffect(() => {
-    if (form.mode === 'text' || settingsOpen || errorDialog) {
+    if (form.mode === "text" || settingsOpen || errorDialog) {
       return;
     }
 
@@ -407,18 +471,21 @@ function App() {
       }
 
       event.preventDefault();
-      void addFiles(files, 'input')
+      void addFiles(files, "input")
         .then(() => {
-          setMessage(t('status.pastedImages', { count: files.length }));
+          setMessage(t("status.pastedImages", { count: files.length }));
         })
         .catch((error) => notifyError(error));
     }
 
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
   }, [form.mode, settingsOpen, errorDialog, locale]);
 
-  function updateForm<K extends keyof GenerateForm>(key: K, value: GenerateForm[K]) {
+  function updateForm<K extends keyof GenerateForm>(
+    key: K,
+    value: GenerateForm[K],
+  ) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
@@ -444,7 +511,9 @@ function App() {
       return;
     }
     try {
-      const nextLocale = await tauriInvoke<LocaleText>('load_locale', { language });
+      const nextLocale = await tauriInvoke<LocaleText>("load_locale", {
+        language,
+      });
       setLocale({ ...fallbackLocale, ...nextLocale });
     } catch (error) {
       notifyError(error);
@@ -453,10 +522,10 @@ function App() {
 
   async function saveSettings() {
     try {
-      ensureTauri(t('error.tauriOnly'));
-      await tauriInvoke('save_settings', { settings });
+      ensureTauri(t("error.tauriOnly"));
+      await tauriInvoke("save_settings", { settings });
       setSettingsOpen(false);
-      setMessage(t('status.settingsSaved'));
+      setMessage(t("status.settingsSaved"));
     } catch (error) {
       notifyError(error);
     }
@@ -464,13 +533,16 @@ function App() {
 
   async function openExternalUrl(url: string) {
     try {
-      await tauriInvoke('open_external_url', { url });
+      await tauriInvoke("open_external_url", { url });
     } catch (error) {
       notifyError(error);
     }
   }
 
-  async function addFiles(fileList: FileList | File[], target: 'input' | 'mask') {
+  async function addFiles(
+    fileList: FileList | File[],
+    target: "input" | "mask",
+  ) {
     const files = imageFilesFromList(fileList);
     if (files.length === 0) {
       return;
@@ -478,34 +550,70 @@ function App() {
 
     const assets = await Promise.all(files.map(readFileAsAsset));
 
-    if (target === 'mask') {
+    if (target === "mask") {
       setForm((current) => ({
         ...current,
-        maskImage: assets[0] ? { ...assets[0], maskEncoding: 'ui-red' } : null,
+        maskImage: assets[0] ? { ...assets[0], maskEncoding: "ui-red" } : null,
       }));
       return;
     }
 
-    setForm((current) => ({ ...current, inputImages: [...current.inputImages, ...assets] }));
+    setForm((current) => ({
+      ...current,
+      inputImages: [...current.inputImages, ...assets],
+    }));
+  }
+
+  function createBlankInputImage() {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 1024;
+
+    setForm((current) => {
+      if (current.inputImages.length > 0) {
+        return current;
+      }
+
+      return {
+        ...current,
+        inputImages: [
+          {
+            id: crypto.randomUUID(),
+            name: "blank-1024x1024.png",
+            mimeType: "image/png",
+            dataUrl: canvas.toDataURL("image/png"),
+            width: 1024,
+            height: 1024,
+          },
+        ],
+        maskImage: null,
+      };
+    });
   }
 
   function removeInputImage(id: string) {
     updateForm(
-      'inputImages',
+      "inputImages",
       form.inputImages.filter((image) => image.id !== id),
     );
   }
 
   async function generate() {
     if (busy) {
-      setDebugLogs((current) => [...current, 'frontend: ignored duplicate generate click while busy']);
+      setDebugLogs((current) => [
+        ...current,
+        "frontend: ignored duplicate generate click while busy",
+      ]);
       return;
     }
+    const runId = generationRunIdRef.current + 1;
+    generationRunIdRef.current = runId;
+    cancelledRunIdsRef.current.delete(runId);
     const baseForm = normalizedForm();
     setBusy(true);
     setGenerationProgress(null);
     setImages([]);
-    setMessage(t('status.generating'));
+    setMessage(t("status.generating"));
     setSelectedHistoryId(null);
     const startedAt = new Date().toLocaleString();
     const baseLogs = [
@@ -514,9 +622,8 @@ function App() {
     ];
     setDebugLogs(baseLogs);
 
-    let waitTimers: number[] = [];
     try {
-      ensureTauri(t('error.tauriOnly'));
+      ensureTauri(t("error.tauriOnly"));
       await validateRequest(baseForm, t);
       const prepared = await prepareRequestForm(baseForm);
       const requestForm = prepared.form;
@@ -525,24 +632,46 @@ function App() {
         ...current,
         ...prepared.logs,
         `frontend: prepared input_images=${requestForm.inputImages.length} mask=${Boolean(requestForm.maskImage)}`,
-        `frontend: prepared input_media_types=${requestForm.inputImages.map((image) => image.mimeType).join(', ') || '(none)'}`,
-        `frontend: prepared mask_media_type=${requestForm.maskImage?.mimeType || '(none)'}`,
+        `frontend: prepared input_media_types=${requestForm.inputImages.map((image) => image.mimeType).join(", ") || "(none)"}`,
+        `frontend: prepared mask_media_type=${requestForm.maskImage?.mimeType || "(none)"}`,
         `frontend: request preview json=${buildFrontendRequestPreview(requestForm)}`,
-        'frontend: invoking backend generate_image',
+        "frontend: invoking backend generate_image",
       ]);
-      waitTimers = backendWaitLogMs.map((milliseconds) => window.setTimeout(() => {
+      backendWaitTimersRef.current = backendWaitLogMs.map((milliseconds) =>
+        window.setTimeout(() => {
+          if (cancelledRunIdsRef.current.has(runId)) {
+            return;
+          }
+          setDebugLogs((current) => [
+            ...current,
+            `frontend: ${t("status.waitingBackend", { seconds: Math.round(milliseconds / 1000) })}`,
+          ]);
+        }, milliseconds),
+      );
+      const response = await withTimeout(
+        tauriInvoke<GenerateResponse>("generate_image", {
+          request: requestForm,
+        }),
+        backendTimeoutMs,
+        t("error.backendTimeout", {
+          seconds: Math.round(backendTimeoutMs / 1000),
+        }),
+      );
+      if (
+        cancelledRunIdsRef.current.has(runId) ||
+        generationRunIdRef.current !== runId
+      ) {
         setDebugLogs((current) => [
           ...current,
-          `frontend: ${t('status.waitingBackend', { seconds: Math.round(milliseconds / 1000) })}`,
+          `frontend: backend response received after stop; ignored images=${response.images.length}`,
         ]);
-      }, milliseconds));
-      const response = await withTimeout(
-        tauriInvoke<GenerateResponse>('generate_image', { request: requestForm }),
-        backendTimeoutMs,
-        t('error.backendTimeout', { seconds: Math.round(backendTimeoutMs / 1000) }),
-      );
+        return;
+      }
       setImages(response.images);
-      setDebugLogs((current) => [...current, `frontend: received images=${response.images.length}`]);
+      setDebugLogs((current) => [
+        ...current,
+        `frontend: received images=${response.images.length}`,
+      ]);
 
       const item: HistoryItem = {
         id: crypto.randomUUID(),
@@ -552,27 +681,67 @@ function App() {
         images: response.images,
       };
       setHistory((current) => [item, ...current].slice(0, historyLimit));
-      setMessage(t('status.savedImages', { count: response.images.length, path: outputDir }));
+      setMessage(
+        t("status.savedImages", {
+          count: response.images.length,
+          path: outputDir,
+        }),
+      );
       playCompletionSound();
     } catch (error) {
+      if (
+        cancelledRunIdsRef.current.has(runId) ||
+        generationRunIdRef.current !== runId
+      ) {
+        const errorText = formatErrorText(error);
+        setDebugLogs((current) => [
+          ...current,
+          `frontend: backend error received after stop; ignored error=${errorText.split("\n")[0] || errorText}`,
+          ...extractDebugLogs(errorText),
+        ]);
+        return;
+      }
       const errorText = notifyError(error);
       const backendLogs = extractDebugLogs(errorText);
       setDebugLogs((current) => [
         ...current,
-        `frontend: error=${errorText.split('\n')[0] || errorText}`,
+        `frontend: error=${errorText.split("\n")[0] || errorText}`,
         ...backendLogs,
       ]);
     } finally {
-      waitTimers.forEach((timer) => window.clearTimeout(timer));
-      setGenerationProgress(null);
-      setBusy(false);
+      backendWaitTimersRef.current.forEach((timer) =>
+        window.clearTimeout(timer),
+      );
+      backendWaitTimersRef.current = [];
+      cancelledRunIdsRef.current.delete(runId);
+      if (generationRunIdRef.current === runId) {
+        setGenerationProgress(null);
+        setBusy(false);
+      }
     }
+  }
+
+  function stopGeneration() {
+    if (!busy) {
+      return;
+    }
+    const runId = generationRunIdRef.current;
+    cancelledRunIdsRef.current.add(runId);
+    backendWaitTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    backendWaitTimersRef.current = [];
+    setGenerationProgress(null);
+    setBusy(false);
+    setMessage(t("status.cancelled"));
+    setDebugLogs((current) => [
+      ...current,
+      `frontend: stop clicked run=${runId}; pending backend response will be ignored`,
+    ]);
   }
 
   async function copyImage(path: string) {
     try {
-      await tauriInvoke('copy_image_to_clipboard', { path });
-      setMessage(t('status.copiedImage'));
+      await tauriInvoke("copy_image_to_clipboard", { path });
+      setMessage(t("status.copiedImage"));
     } catch (error) {
       notifyError(error);
     }
@@ -584,7 +753,7 @@ function App() {
     }
     try {
       await navigator.clipboard.writeText(errorDialog);
-      setMessage(t('status.copiedError'));
+      setMessage(t("status.copiedError"));
     } catch (error) {
       notifyError(error);
     }
@@ -592,7 +761,7 @@ function App() {
 
   async function showImageInFinder(path: string) {
     try {
-      await tauriInvoke('show_in_finder', { path });
+      await tauriInvoke("show_in_finder", { path });
     } catch (error) {
       notifyError(error);
     }
@@ -600,13 +769,13 @@ function App() {
 
   async function saveImageAs(path: string) {
     try {
-      const savedPath = await tauriInvoke<string>('save_as_image', {
+      const savedPath = await tauriInvoke<string>("save_as_image", {
         sourcePath: path,
       });
-      setMessage(t('status.savedAs', { path: savedPath }));
+      setMessage(t("status.savedAs", { path: savedPath }));
     } catch (error) {
       const text = formatErrorText(error);
-      if (!text.includes('保存先が選択されませんでした')) {
+      if (!text.includes("保存先が選択されませんでした")) {
         notifyError(text);
       }
     }
@@ -615,10 +784,13 @@ function App() {
   async function loadFromHistory(item: HistoryItem) {
     const hydratedItem = await hydrateHistoryItemAssets(item);
     setSelectedHistoryId(item.id);
-    const nextSettings = normalizeFormAgainstConfig({ ...buildInitialForm(appConfig), ...hydratedItem.settings }, appConfig);
+    const nextSettings = normalizeFormAgainstConfig(
+      { ...buildInitialForm(appConfig), ...hydratedItem.settings },
+      appConfig,
+    );
     setForm(nextSettings);
     setImages(hydratedItem.images);
-    setMessage(t('status.loadedHistory'));
+    setMessage(t("status.loadedHistory"));
   }
 
   async function loadHistoryImages(items: HistoryItem[]) {
@@ -632,7 +804,9 @@ function App() {
           return image;
         }
         try {
-          const dataUrl = await tauriInvoke<string>('load_image_data_url', { path: image.path });
+          const dataUrl = await tauriInvoke<string>("load_image_data_url", {
+            path: image.path,
+          });
           return { ...image, dataUrl };
         } catch {
           return image;
@@ -641,8 +815,12 @@ function App() {
     );
   }
 
-  async function hydrateHistoryItemAssets(item: HistoryItem): Promise<HistoryItem> {
-    const inputImages = await loadImageAssetsDataUrl(item.settings.inputImages ?? []);
+  async function hydrateHistoryItemAssets(
+    item: HistoryItem,
+  ): Promise<HistoryItem> {
+    const inputImages = await loadImageAssetsDataUrl(
+      item.settings.inputImages ?? [],
+    );
     const maskImage = item.settings.maskImage
       ? await loadMaskAssetForUi(item.settings.maskImage)
       : null;
@@ -666,7 +844,9 @@ function App() {
       return asset;
     }
     try {
-      const dataUrl = await tauriInvoke<string>('load_image_data_url', { path: asset.path });
+      const dataUrl = await tauriInvoke<string>("load_image_data_url", {
+        path: asset.path,
+      });
       const size = await readImageSize(dataUrl);
       return { ...asset, dataUrl, width: size.width, height: size.height };
     } catch {
@@ -676,7 +856,7 @@ function App() {
 
   async function loadMaskAssetForUi(asset: ImageAsset): Promise<ImageAsset> {
     const loaded = await loadImageAssetDataUrl(asset);
-    if (loaded.maskEncoding !== 'api-alpha' || !loaded.dataUrl) {
+    if (loaded.maskEncoding !== "api-alpha" || !loaded.dataUrl) {
       return loaded;
     }
     return buildUiMaskFromApiMask(loaded);
@@ -686,46 +866,66 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="brand">
-          <ImageIcon size={22} />
+          <img className="brand-icon" src={appIcon} alt="" aria-hidden="true" />
           <div>
-            <h1>{t('app.title')}</h1>
-            <p>{t('app.subtitle')}</p>
+            <h1>{t("app.title")}</h1>
+            <p>{t("app.subtitle")}</p>
           </div>
         </div>
         <div className="top-actions">
           {!debugOpen && (
-            <button className="icon-button" type="button" onClick={() => setDebugOpen(true)}>
+            <button
+              className="icon-button"
+              type="button"
+              onClick={() => setDebugOpen(true)}
+            >
               <ChevronUp size={18} />
-              <span>{t('action.openLogs')}</span>
+              <span>{t("action.openLogs")}</span>
             </button>
           )}
-          <button className="icon-button" type="button" onClick={() => setSettingsOpen(true)} title={t('aria.settings')}>
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            title={t("aria.settings")}
+          >
             <Settings size={18} />
-            <span>{t('button.settings')}</span>
+            <span>{t("button.settings")}</span>
           </button>
         </div>
       </header>
 
-      <main className={`workspace ${debugOpen ? 'logs-open' : ''}`}>
-        <section ref={composerRef} className="composer-panel" aria-label={t('aria.composer')}>
+      <main className={`workspace ${debugOpen ? "logs-open" : ""}`}>
+        <section
+          ref={composerRef}
+          className="composer-panel"
+          aria-label={t("aria.composer")}
+        >
           <div className="panel-heading">
             <SlidersHorizontal size={18} />
-            <h2>{t('section.composer')}</h2>
+            <h2>{t("section.composer")}</h2>
           </div>
 
-          <div className="tabs" role="tablist" aria-label={t('aria.modeTabs')}>
+          <div className="tabs" role="tablist" aria-label={t("aria.modeTabs")}>
             {tabs.map((tab) => (
               <button
-                className={form.mode === tab.id ? 'active' : ''}
+                className={form.mode === tab.id ? "active" : ""}
                 type="button"
                 role="tab"
                 aria-selected={form.mode === tab.id}
                 key={tab.id}
-                onClick={() => setForm((current) => normalizeFormAgainstConfig({
-                  ...current,
-                  mode: tab.id,
-                  action: actionForMode(tab.id),
-                }, appConfig))}
+                onClick={() =>
+                  setForm((current) =>
+                    normalizeFormAgainstConfig(
+                      {
+                        ...current,
+                        mode: tab.id,
+                        action: actionForMode(tab.id),
+                      },
+                      appConfig,
+                    ),
+                  )
+                }
               >
                 {tab.label}
               </button>
@@ -733,115 +933,128 @@ function App() {
           </div>
 
           <label className="field wide">
-            <span>{t('field.prompt')}</span>
+            <span>{t("field.prompt")}</span>
             <textarea
               value={form.prompt}
-              onChange={(event) => updateForm('prompt', event.target.value)}
-              placeholder={t('field.prompt.placeholder')}
+              onChange={(event) => updateForm("prompt", event.target.value)}
+              placeholder={t("field.prompt.placeholder")}
             />
           </label>
 
-          {form.mode !== 'text' && (
+          {form.mode !== "text" && (
             <ImageInputPanel
               images={form.inputImages}
-              onAdd={(files) => addFiles(files, 'input')}
+              onAdd={(files) => addFiles(files, "input")}
               onRemove={removeInputImage}
               t={t}
             />
           )}
 
-          {form.mode === 'edit-mask' && (
+          {form.mode === "edit-mask" && (
             <MaskPanel
               baseImage={form.inputImages[0] ?? null}
               maskImage={form.maskImage}
               brushSize={brushSize}
               onBrushSizeChange={setBrushSize}
-              onMaskFile={(files) => addFiles(files, 'mask')}
-              onMaskChange={(maskImage) => updateForm('maskImage', maskImage)}
+              onMaskFile={(files) => addFiles(files, "mask")}
+              onMaskChange={(maskImage) => updateForm("maskImage", maskImage)}
+              onCreateBlankInput={createBlankInputImage}
               t={t}
             />
           )}
 
           <div className="field-grid">
             <SelectField
-              label={t('field.model')}
+              label={t("field.model")}
               value={form.model}
               options={modelOptions()}
-              onChange={(value) => updateForm('model', value)}
+              onChange={(value) => updateForm("model", value)}
             />
             <SelectField
-              label={t('field.size')}
+              label={t("field.size")}
               value={form.size}
               options={appConfig.sizes}
-              onChange={(value) => updateForm('size', value)}
+              onChange={(value) => updateForm("size", value)}
             />
             <SelectField
-              label={t('field.quality')}
+              label={t("field.quality")}
               value={form.quality}
               options={appConfig.qualities}
-              onChange={(value) => updateForm('quality', value)}
+              onChange={(value) => updateForm("quality", value)}
             />
             <SelectField
-              label={t('field.format')}
+              label={t("field.format")}
               value={form.outputFormat}
               options={appConfig.outputFormats}
-              onChange={(value) => updateForm('outputFormat', value)}
+              onChange={(value) => updateForm("outputFormat", value)}
             />
             <SelectField
-              label={t('field.background')}
+              label={t("field.background")}
               value={form.background}
               options={appConfig.backgrounds}
-              onChange={(value) => updateForm('background', value)}
+              onChange={(value) => updateForm("background", value)}
             />
             <SelectField
-              label={t('field.moderation')}
+              label={t("field.moderation")}
               value={form.moderation}
               options={appConfig.moderations}
-              onChange={(value) => updateForm('moderation', value)}
+              onChange={(value) => updateForm("moderation", value)}
             />
           </div>
 
-          <label className={`field ${canCompress ? '' : 'disabled'}`}>
-            <span>{canCompress ? t('field.compression', { value: form.outputCompression }) : t('field.compression.disabled')}</span>
+          <label className={`field ${canCompress ? "" : "disabled"}`}>
+            <span>
+              {canCompress
+                ? t("field.compression", { value: form.outputCompression })
+                : t("field.compression.disabled")}
+            </span>
             <input
               type="range"
               min={appConfig.limits.outputCompressionMin}
               max={appConfig.limits.outputCompressionMax}
               value={form.outputCompression}
               disabled={!canCompress}
-              onChange={(event) => updateForm('outputCompression', Number(event.target.value))}
+              onChange={(event) =>
+                updateForm("outputCompression", Number(event.target.value))
+              }
             />
           </label>
 
           <label className="field">
-            <span>{t('field.count', { value: form.count })}</span>
+            <span>{t("field.count", { value: form.count })}</span>
             <input
               type="range"
               min={appConfig.limits.countMin}
               max={appConfig.limits.countMax}
               value={form.count}
-              onChange={(event) => updateForm('count', Number(event.target.value))}
+              onChange={(event) =>
+                updateForm("count", Number(event.target.value))
+              }
             />
           </label>
 
-          <button className="primary-action" type="button" onClick={generate} disabled={busy}>
-            {busy ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
+          <button
+            className={`primary-action ${busy ? "stop-action" : ""}`}
+            type="button"
+            onClick={busy ? stopGeneration : generate}
+          >
+            {busy ? <X size={18} /> : <Play size={18} />}
             <span>{buttonLabel}</span>
           </button>
 
           {message && <p className="status-line">{message}</p>}
         </section>
 
-        <section className="preview-panel" aria-label={t('aria.preview')}>
+        <section className="preview-panel" aria-label={t("aria.preview")}>
           <div className="panel-heading">
             <Download size={18} />
-            <h2>{t('section.preview')}</h2>
+            <h2>{t("section.preview")}</h2>
           </div>
 
           {images.length === 0 ? (
             <div className="empty-preview">
               <ImageIcon size={38} />
-              <p>{t('empty.preview')}</p>
+              <p>{t("empty.preview")}</p>
             </div>
           ) : (
             <div className={`image-grid ${previewGridClass(images.length)}`}>
@@ -851,7 +1064,11 @@ function App() {
                   key={image.path}
                   onContextMenu={(event) => {
                     event.preventDefault();
-                    setContextMenu({ x: event.clientX, y: event.clientY, image });
+                    setContextMenu({
+                      x: event.clientX,
+                      y: event.clientY,
+                      image,
+                    });
                   }}
                 >
                   <img src={image.dataUrl} alt="Generated result" />
@@ -861,14 +1078,14 @@ function App() {
           )}
         </section>
 
-        <aside className="history-panel" aria-label={t('aria.history')}>
+        <aside className="history-panel" aria-label={t("aria.history")}>
           <div className="panel-heading">
             <History size={18} />
-            <h2>{t('section.history')}</h2>
+            <h2>{t("section.history")}</h2>
           </div>
 
           {history.length === 0 ? (
-            <p className="history-empty">{t('empty.history')}</p>
+            <p className="history-empty">{t("empty.history")}</p>
           ) : (
             <div className="history-list">
               {history.map((item) => (
@@ -884,56 +1101,76 @@ function App() {
         </aside>
 
         {debugOpen && (
-          <section className="debug-panel" aria-label={t('aria.debug')}>
+          <section className="debug-panel" aria-label={t("aria.debug")}>
             <div className="panel-heading">
               <FileText size={18} />
-              <h2>{t('section.debug')}</h2>
+              <h2>{t("section.debug")}</h2>
             </div>
             <div className="debug-actions">
-              <button type="button" onClick={() => navigator.clipboard.writeText(debugLogs.join('\n'))}>
+              <button
+                type="button"
+                onClick={() =>
+                  navigator.clipboard.writeText(debugLogs.join("\n"))
+                }
+              >
                 <Copy size={15} />
-                <span>{t('action.copyLogs')}</span>
+                <span>{t("action.copyLogs")}</span>
               </button>
               <button type="button" onClick={() => setDebugLogs([])}>
                 <Trash2 size={15} />
-                <span>{t('action.clearLogs')}</span>
+                <span>{t("action.clearLogs")}</span>
               </button>
               <button type="button" onClick={() => setDebugOpen(false)}>
                 <ChevronDown size={15} />
-                <span>{t('action.closeLogs')}</span>
+                <span>{t("action.closeLogs")}</span>
               </button>
             </div>
-            <pre>{debugLogs.length > 0 ? debugLogs.join('\n') : t('empty.logs')}</pre>
+            <pre>
+              {debugLogs.length > 0 ? debugLogs.join("\n") : t("empty.logs")}
+            </pre>
           </section>
         )}
       </main>
 
       {contextMenu && (
-        <div className="context-menu-backdrop" onClick={() => setContextMenu(null)} onContextMenu={(event) => event.preventDefault()}>
-          <div className="context-menu" style={{ left: contextMenu.x, top: contextMenu.y }}>
+        <div
+          className="context-menu-backdrop"
+          onClick={() => setContextMenu(null)}
+          onContextMenu={(event) => event.preventDefault()}
+        >
+          <div
+            className="context-menu"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+          >
             <button
               type="button"
               onClick={() => {
-                showImageInFinder(contextMenu.image.path).finally(() => setContextMenu(null));
+                showImageInFinder(contextMenu.image.path).finally(() =>
+                  setContextMenu(null),
+                );
               }}
             >
-              {t('action.finder')}
+              {t("action.finder")}
             </button>
             <button
               type="button"
               onClick={() => {
-                saveImageAs(contextMenu.image.path).finally(() => setContextMenu(null));
+                saveImageAs(contextMenu.image.path).finally(() =>
+                  setContextMenu(null),
+                );
               }}
             >
-              {t('action.saveAs')}
+              {t("action.saveAs")}
             </button>
             <button
               type="button"
               onClick={() => {
-                copyImage(contextMenu.image.path).finally(() => setContextMenu(null));
+                copyImage(contextMenu.image.path).finally(() =>
+                  setContextMenu(null),
+                );
               }}
             >
-              {t('action.copy')}
+              {t("action.copy")}
             </button>
           </div>
         </div>
@@ -941,21 +1178,38 @@ function App() {
 
       {errorDialog && (
         <div className="modal-backdrop" role="presentation">
-          <section className="error-modal" role="alertdialog" aria-modal="true" aria-label={t('aria.error')}>
+          <section
+            className="error-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={t("aria.error")}
+          >
             <div className="modal-heading">
-              <h2>{t('modal.error.title')}</h2>
-              <button type="button" onClick={() => setErrorDialog(null)} title={t('title.close')}>
+              <h2>{t("modal.error.title")}</h2>
+              <button
+                type="button"
+                onClick={() => setErrorDialog(null)}
+                title={t("title.close")}
+              >
                 <X size={18} />
               </button>
             </div>
             <pre>{errorDialog}</pre>
             <div className="modal-actions">
-              <button className="secondary-action compact" type="button" onClick={copyErrorDetails}>
+              <button
+                className="secondary-action compact"
+                type="button"
+                onClick={copyErrorDetails}
+              >
                 <Copy size={16} />
-                <span>{t('action.copyError')}</span>
+                <span>{t("action.copyError")}</span>
               </button>
-              <button className="primary-action compact" type="button" onClick={() => setErrorDialog(null)}>
-                <span>{t('action.close')}</span>
+              <button
+                className="primary-action compact"
+                type="button"
+                onClick={() => setErrorDialog(null)}
+              >
+                <span>{t("action.close")}</span>
               </button>
             </div>
           </section>
@@ -964,46 +1218,73 @@ function App() {
 
       {settingsOpen && (
         <div className="modal-backdrop" role="presentation">
-          <section className="settings-modal" role="dialog" aria-modal="true" aria-label={t('aria.settings')}>
+          <section
+            className="settings-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("aria.settings")}
+          >
             <div className="modal-heading">
-              <h2>{t('modal.settings.title')}</h2>
-              <button type="button" onClick={() => setSettingsOpen(false)} title={t('title.close')}>
+              <h2>{t("modal.settings.title")}</h2>
+              <button
+                type="button"
+                onClick={() => setSettingsOpen(false)}
+                title={t("title.close")}
+              >
                 <X size={18} />
               </button>
             </div>
             <SelectField
-              label={t('field.language')}
+              label={t("field.language")}
               value={settings.language}
-              options={availableLocales.map((item) => ({ value: item.code, label: item.name }))}
+              options={availableLocales.map((item) => ({
+                value: item.code,
+                label: item.name,
+              }))}
               onChange={changeLanguage}
             />
             <label className="field api-key-field">
-              <span>{t('field.apiKey')}</span>
+              <span>{t("field.apiKey")}</span>
               <textarea
                 value={settings.apiKey}
-                onChange={(event) => setSettings((current) => ({ ...current, apiKey: event.target.value }))}
-                placeholder={t('field.apiKey.placeholder')}
+                onChange={(event) =>
+                  setSettings((current) => ({
+                    ...current,
+                    apiKey: event.target.value,
+                  }))
+                }
+                placeholder={t("field.apiKey.placeholder")}
               />
             </label>
             <div className="settings-link-row">
               <button
                 className="secondary-action compact"
                 type="button"
-                onClick={() => openExternalUrl('https://platform.openai.com/api-keys')}
+                onClick={() =>
+                  openExternalUrl("https://platform.openai.com/api-keys")
+                }
               >
-                <span>{t('action.openApiKeys')}</span>
+                <span>{t("action.openApiKeys")}</span>
               </button>
               <button
                 className="secondary-action compact"
                 type="button"
-                onClick={() => openExternalUrl('https://platform.openai.com/settings/organization/billing/overview')}
+                onClick={() =>
+                  openExternalUrl(
+                    "https://platform.openai.com/settings/organization/billing/overview",
+                  )
+                }
               >
-                <span>{t('action.openBilling')}</span>
+                <span>{t("action.openBilling")}</span>
               </button>
             </div>
-            <button className="primary-action compact" type="button" onClick={saveSettings}>
+            <button
+              className="primary-action compact"
+              type="button"
+              onClick={saveSettings}
+            >
               <Save size={18} />
-              <span>{t('action.save')}</span>
+              <span>{t("action.save")}</span>
             </button>
           </section>
         </div>
@@ -1039,7 +1320,7 @@ function ImageInputPanel({
         onClick={() => inputRef.current?.click()}
       >
         <Upload size={18} />
-        <span>{t('field.uploadImages')}</span>
+        <span>{t("field.uploadImages")}</span>
         <input
           ref={inputRef}
           type="file"
@@ -1054,7 +1335,11 @@ function ImageInputPanel({
             <article className="asset-thumb" key={image.id}>
               <img src={image.dataUrl} alt={image.name} />
               <span title={image.name}>{image.name}</span>
-              <button type="button" onClick={() => onRemove(image.id)} title={t('title.delete')}>
+              <button
+                type="button"
+                onClick={() => onRemove(image.id)}
+                title={t("title.delete")}
+              >
                 <Trash2 size={15} />
               </button>
             </article>
@@ -1072,6 +1357,7 @@ function MaskPanel({
   onBrushSizeChange,
   onMaskFile,
   onMaskChange,
+  onCreateBlankInput,
   t,
 }: {
   baseImage: ImageAsset | null;
@@ -1080,6 +1366,7 @@ function MaskPanel({
   onBrushSizeChange: (value: number) => void;
   onMaskFile: (files: FileList | File[]) => void;
   onMaskChange: (maskImage: ImageAsset | null) => void;
+  onCreateBlankInput: () => void;
   t: (key: string, replacements?: Record<string, string | number>) => string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -1100,12 +1387,12 @@ function MaskPanel({
       }
       canvas.width = Math.max(1, image.naturalWidth || image.width);
       canvas.height = Math.max(1, image.naturalHeight || image.height);
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext("2d");
       if (!context) {
         return;
       }
       context.clearRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = 'rgba(0, 0, 0, 0)';
+      context.fillStyle = "rgba(0, 0, 0, 0)";
       context.fillRect(0, 0, canvas.width, canvas.height);
       if (!maskImage?.dataUrl) {
         return;
@@ -1130,7 +1417,7 @@ function MaskPanel({
       return;
     }
     const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
+    const context = canvas?.getContext("2d");
     if (!canvas || !context) {
       return;
     }
@@ -1140,8 +1427,8 @@ function MaskPanel({
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const brushScale = (scaleX + scaleY) / 2;
-    context.globalCompositeOperation = 'source-over';
-    context.fillStyle = 'rgba(255, 0, 0, 1)';
+    context.globalCompositeOperation = "source-over";
+    context.fillStyle = "rgba(255, 0, 0, 1)";
     context.beginPath();
     context.arc(x, y, (brushSize * brushScale) / 2, 0, Math.PI * 2);
     context.fill();
@@ -1154,10 +1441,10 @@ function MaskPanel({
     }
     onMaskChange({
       id: crypto.randomUUID(),
-      name: 'drawn-mask.png',
-      mimeType: 'image/png',
-      dataUrl: canvas.toDataURL('image/png'),
-      maskEncoding: 'ui-red',
+      name: "drawn-mask.png",
+      mimeType: "image/png",
+      dataUrl: canvas.toDataURL("image/png"),
+      maskEncoding: "ui-red",
       width: canvas.width,
       height: canvas.height,
     });
@@ -1165,7 +1452,7 @@ function MaskPanel({
 
   function clearMask() {
     const canvas = canvasRef.current;
-    const context = canvas?.getContext('2d');
+    const context = canvas?.getContext("2d");
     if (canvas && context) {
       context.clearRect(0, 0, canvas.width, canvas.height);
     }
@@ -1175,13 +1462,19 @@ function MaskPanel({
   return (
     <section className="mask-panel">
       <div className="mask-toolbar">
+        {!baseImage && (
+          <button type="button" onClick={onCreateBlankInput}>
+            <ImageIcon size={15} />
+            <span>{t("action.createBlankCanvas")}</span>
+          </button>
+        )}
         <button type="button" onClick={() => fileRef.current?.click()}>
           <Upload size={15} />
-          <span>{t('action.loadMask')}</span>
+          <span>{t("action.loadMask")}</span>
         </button>
         <button type="button" onClick={clearMask}>
           <Eraser size={15} />
-          <span>{t('action.clear')}</span>
+          <span>{t("action.clear")}</span>
         </button>
         <label>
           <Brush size={15} />
@@ -1198,7 +1491,9 @@ function MaskPanel({
           ref={fileRef}
           type="file"
           accept="image/*"
-          onChange={(event) => event.target.files && onMaskFile(event.target.files)}
+          onChange={(event) =>
+            event.target.files && onMaskFile(event.target.files)
+          }
         />
       </div>
       <div className="mask-canvas-wrap">
@@ -1209,13 +1504,17 @@ function MaskPanel({
               ref={canvasRef}
               onPointerDown={(event) => {
                 drawingRef.current = true;
-                (event.target as HTMLCanvasElement).setPointerCapture(event.pointerId);
+                (event.target as HTMLCanvasElement).setPointerCapture(
+                  event.pointerId,
+                );
                 draw(event);
               }}
               onPointerMove={draw}
               onPointerUp={(event) => {
                 drawingRef.current = false;
-                (event.target as HTMLCanvasElement).releasePointerCapture(event.pointerId);
+                (event.target as HTMLCanvasElement).releasePointerCapture(
+                  event.pointerId,
+                );
                 commitMask();
               }}
               onPointerLeave={() => {
@@ -1224,7 +1523,7 @@ function MaskPanel({
             />
           </>
         ) : (
-          <p>{t('message.addInputFirst')}</p>
+          <p>{t("message.addInputFirst")}</p>
         )}
       </div>
       {maskImage && (
@@ -1246,25 +1545,34 @@ function HistoryButton({
   selected: boolean;
   onClick: () => void;
 }) {
-  const thumbnail = item.images[0]?.dataUrl || item.settings.inputImages?.[0]?.dataUrl || '';
+  const thumbnail =
+    item.images[0]?.dataUrl || item.settings.inputImages?.[0]?.dataUrl || "";
 
   return (
     <button
-      className={`history-item ${selected ? 'active' : ''}`}
+      className={`history-item ${selected ? "active" : ""}`}
       type="button"
       onClick={onClick}
     >
-      {thumbnail ? <img src={thumbnail} alt="" /> : <span className="history-thumb-placeholder"><ImageIcon size={20} /></span>}
+      {thumbnail ? (
+        <img src={thumbnail} alt="" />
+      ) : (
+        <span className="history-thumb-placeholder">
+          <ImageIcon size={20} />
+        </span>
+      )}
       <span>{new Date(item.createdAt).toLocaleString()}</span>
-      <strong>{item.prompt || '(empty prompt)'}</strong>
+      <strong>{item.prompt || "(empty prompt)"}</strong>
     </button>
   );
 }
 
-function normalizeSettings(value: Partial<AppSettings> | null | undefined): AppSettings {
+function normalizeSettings(
+  value: Partial<AppSettings> | null | undefined,
+): AppSettings {
   return {
-    apiKey: value?.apiKey ?? '',
-    language: value?.language || 'en',
+    apiKey: value?.apiKey ?? "",
+    language: value?.language || "en",
   };
 }
 
@@ -1276,31 +1584,69 @@ function buildInitialForm(appConfig: AppConfig): GenerateForm {
   };
 }
 
-function normalizeAppConfig(value: Partial<AppConfig> | null | undefined): AppConfig {
-  const models = coerceOptions(value?.models, fallbackAppConfig.models)
-    .filter((option) => !option.value.startsWith('gpt-4'));
-  const imageEditModels = coerceOptions(value?.imageEditModels, fallbackAppConfig.imageEditModels);
+function normalizeAppConfig(
+  value: Partial<AppConfig> | null | undefined,
+): AppConfig {
+  const models = coerceOptions(value?.models, fallbackAppConfig.models).filter(
+    (option) => !option.value.startsWith("gpt-4"),
+  );
+  const imageEditModels = coerceOptions(
+    value?.imageEditModels,
+    fallbackAppConfig.imageEditModels,
+  );
   const normalized: AppConfig = {
     defaults: {
       ...fallbackAppConfig.defaults,
       ...(isObject(value?.defaults) ? value?.defaults : {}),
     },
     limits: {
-      history: coerceNumber(value?.limits?.history, fallbackAppConfig.limits.history),
-      countMin: coerceNumber(value?.limits?.countMin, fallbackAppConfig.limits.countMin),
-      countMax: coerceNumber(value?.limits?.countMax, fallbackAppConfig.limits.countMax),
-      outputCompressionMin: coerceNumber(value?.limits?.outputCompressionMin, fallbackAppConfig.limits.outputCompressionMin),
-      outputCompressionMax: coerceNumber(value?.limits?.outputCompressionMax, fallbackAppConfig.limits.outputCompressionMax),
-      requestDelayMs: coerceNumber(value?.limits?.requestDelayMs, fallbackAppConfig.limits.requestDelayMs),
+      history: coerceNumber(
+        value?.limits?.history,
+        fallbackAppConfig.limits.history,
+      ),
+      countMin: coerceNumber(
+        value?.limits?.countMin,
+        fallbackAppConfig.limits.countMin,
+      ),
+      countMax: coerceNumber(
+        value?.limits?.countMax,
+        fallbackAppConfig.limits.countMax,
+      ),
+      outputCompressionMin: coerceNumber(
+        value?.limits?.outputCompressionMin,
+        fallbackAppConfig.limits.outputCompressionMin,
+      ),
+      outputCompressionMax: coerceNumber(
+        value?.limits?.outputCompressionMax,
+        fallbackAppConfig.limits.outputCompressionMax,
+      ),
+      requestDelayMs: coerceNumber(
+        value?.limits?.requestDelayMs,
+        fallbackAppConfig.limits.requestDelayMs,
+      ),
     },
-    modes: coerceStringArray(value?.modes, fallbackAppConfig.modes).filter(isWorkMode),
+    modes: coerceStringArray(value?.modes, fallbackAppConfig.modes).filter(
+      isWorkMode,
+    ),
     models: models.length > 0 ? models : fallbackAppConfig.models,
-    imageEditModels: imageEditModels.length > 0 ? imageEditModels : fallbackAppConfig.imageEditModels,
+    imageEditModels:
+      imageEditModels.length > 0
+        ? imageEditModels
+        : fallbackAppConfig.imageEditModels,
     sizes: coerceStringArray(value?.sizes, fallbackAppConfig.sizes),
     qualities: coerceStringArray(value?.qualities, fallbackAppConfig.qualities),
-    outputFormats: coerceStringArray(value?.outputFormats, fallbackAppConfig.outputFormats),
-    backgrounds: coerceStringArray(value?.backgrounds, fallbackAppConfig.backgrounds),
-    moderations: coerceStringArray(value?.moderations, fallbackAppConfig.moderations),
+    outputFormats: coerceStringArray(
+      value?.outputFormats,
+      fallbackAppConfig.outputFormats,
+    ),
+    backgrounds: coerceStringArray(
+      value?.backgrounds,
+      fallbackAppConfig.backgrounds,
+    ),
+    moderations: coerceStringArray(
+      value?.moderations,
+      fallbackAppConfig.moderations,
+    ),
   };
 
   if (normalized.limits.countMin < 1) {
@@ -1309,18 +1655,28 @@ function normalizeAppConfig(value: Partial<AppConfig> | null | undefined): AppCo
   if (normalized.limits.countMax < normalized.limits.countMin) {
     normalized.limits.countMax = normalized.limits.countMin;
   }
-  if (normalized.limits.outputCompressionMax < normalized.limits.outputCompressionMin) {
-    normalized.limits.outputCompressionMax = normalized.limits.outputCompressionMin;
+  if (
+    normalized.limits.outputCompressionMax <
+    normalized.limits.outputCompressionMin
+  ) {
+    normalized.limits.outputCompressionMax =
+      normalized.limits.outputCompressionMin;
   }
   if (normalized.modes.length === 0) {
     normalized.modes = fallbackAppConfig.modes;
   }
 
-  normalized.defaults = normalizeFormAgainstConfig(buildInitialForm(normalized), normalized);
+  normalized.defaults = normalizeFormAgainstConfig(
+    buildInitialForm(normalized),
+    normalized,
+  );
   return normalized;
 }
 
-function normalizeFormAgainstConfig(form: GenerateForm, appConfig: AppConfig): GenerateForm {
+function normalizeFormAgainstConfig(
+  form: GenerateForm,
+  appConfig: AppConfig,
+): GenerateForm {
   const defaultForm = buildInitialForm({
     ...appConfig,
     defaults: {
@@ -1328,27 +1684,47 @@ function normalizeFormAgainstConfig(form: GenerateForm, appConfig: AppConfig): G
       ...appConfig.defaults,
     },
   });
-  const mode = appConfig.modes.includes(form.mode) ? form.mode : defaultForm.mode;
+  const mode = appConfig.modes.includes(form.mode)
+    ? form.mode
+    : defaultForm.mode;
   const modelOptions = modelsForMode(appConfig, mode);
   return {
     ...form,
     mode,
-    model: modelOptions.some((option) => option.value === form.model) ? form.model : modelOptions[0]?.value ?? defaultForm.model,
+    model: modelOptions.some((option) => option.value === form.model)
+      ? form.model
+      : (modelOptions[0]?.value ?? defaultForm.model),
     size: appConfig.sizes.includes(form.size) ? form.size : defaultForm.size,
-    quality: appConfig.qualities.includes(form.quality) ? form.quality : defaultForm.quality,
-    outputFormat: appConfig.outputFormats.includes(form.outputFormat) ? form.outputFormat : defaultForm.outputFormat,
-    outputCompression: clampNumber(form.outputCompression, appConfig.limits.outputCompressionMin, appConfig.limits.outputCompressionMax),
-    background: appConfig.backgrounds.includes(form.background) ? form.background : defaultForm.background,
-    moderation: appConfig.moderations.includes(form.moderation) ? form.moderation : defaultForm.moderation,
+    quality: appConfig.qualities.includes(form.quality)
+      ? form.quality
+      : defaultForm.quality,
+    outputFormat: appConfig.outputFormats.includes(form.outputFormat)
+      ? form.outputFormat
+      : defaultForm.outputFormat,
+    outputCompression: clampNumber(
+      form.outputCompression,
+      appConfig.limits.outputCompressionMin,
+      appConfig.limits.outputCompressionMax,
+    ),
+    background: appConfig.backgrounds.includes(form.background)
+      ? form.background
+      : defaultForm.background,
+    moderation: appConfig.moderations.includes(form.moderation)
+      ? form.moderation
+      : defaultForm.moderation,
     action: actionForMode(mode),
-    count: clampNumber(form.count, appConfig.limits.countMin, appConfig.limits.countMax),
+    count: clampNumber(
+      form.count,
+      appConfig.limits.countMin,
+      appConfig.limits.countMax,
+    ),
     inputImages: form.inputImages ?? [],
     maskImage: form.maskImage ?? null,
   };
 }
 
 function modelsForMode(appConfig: AppConfig, mode: WorkMode) {
-  return mode === 'edit-mask' ? appConfig.imageEditModels : appConfig.models;
+  return mode === "edit-mask" ? appConfig.imageEditModels : appConfig.models;
 }
 
 function coerceOptions(value: unknown, fallback: SelectOption[]) {
@@ -1357,13 +1733,13 @@ function coerceOptions(value: unknown, fallback: SelectOption[]) {
   }
   const options = value
     .map((item) => {
-      if (typeof item === 'string') {
+      if (typeof item === "string") {
         return { value: item, label: item };
       }
-      if (isObject(item) && typeof item.value === 'string') {
+      if (isObject(item) && typeof item.value === "string") {
         return {
           value: item.value,
-          label: typeof item.label === 'string' ? item.label : item.value,
+          label: typeof item.label === "string" ? item.label : item.value,
         };
       }
       return null;
@@ -1376,12 +1752,14 @@ function coerceStringArray(value: unknown, fallback: string[]) {
   if (!Array.isArray(value)) {
     return fallback;
   }
-  const strings = value.filter((item): item is string => typeof item === 'string');
+  const strings = value.filter(
+    (item): item is string => typeof item === "string",
+  );
   return strings.length > 0 ? strings : fallback;
 }
 
 function coerceNumber(value: unknown, fallback: number) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 function clampNumber(value: number, min: number, max: number) {
@@ -1389,14 +1767,18 @@ function clampNumber(value: number, min: number, max: number) {
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === "object" && value !== null;
 }
 
 function isWorkMode(value: string): value is WorkMode {
-  return value === 'text' || value === 'image' || value === 'edit-mask';
+  return value === "text" || value === "image" || value === "edit-mask";
 }
 
-function translate(locale: LocaleText, key: string, replacements: Record<string, string | number> = {}) {
+function translate(
+  locale: LocaleText,
+  key: string,
+  replacements: Record<string, string | number> = {},
+) {
   let text = locale[key] ?? fallbackLocale[key] ?? key;
   for (const [name, value] of Object.entries(replacements)) {
     text = text.split(`{${name}}`).join(String(value));
@@ -1405,34 +1787,39 @@ function translate(locale: LocaleText, key: string, replacements: Record<string,
 }
 
 function actionForMode(mode: WorkMode) {
-  return mode === 'text' ? 'generate' : 'edit';
+  return mode === "text" ? "generate" : "edit";
 }
 
 function previewGridClass(count: number) {
   if (count <= 1) {
-    return 'image-grid-1';
+    return "image-grid-1";
   }
   if (count === 2) {
-    return 'image-grid-2';
+    return "image-grid-2";
   }
   if (count === 3) {
-    return 'image-grid-3';
+    return "image-grid-3";
   }
   if (count === 4) {
-    return 'image-grid-4';
+    return "image-grid-4";
   }
-  return 'image-grid-many';
+  return "image-grid-many";
 }
 
-function appendUniqueImage(images: GeneratedImage[], nextImage: GeneratedImage) {
+function appendUniqueImage(
+  images: GeneratedImage[],
+  nextImage: GeneratedImage,
+) {
   if (images.some((image) => image.path === nextImage.path)) {
     return images;
   }
   return [...images, nextImage];
 }
 
-async function prepareRequestForm(form: GenerateForm): Promise<{ form: GenerateForm; logs: string[] }> {
-  if (form.mode !== 'edit-mask' || !form.maskImage) {
+async function prepareRequestForm(
+  form: GenerateForm,
+): Promise<{ form: GenerateForm; logs: string[] }> {
+  if (form.mode !== "edit-mask" || !form.maskImage) {
     return { form, logs: [] };
   }
 
@@ -1447,10 +1834,24 @@ async function prepareRequestForm(form: GenerateForm): Promise<{ form: GenerateF
   const inputSizes = await Promise.all(form.inputImages.map(imageAssetSize));
   const maskSize = await imageAssetSize(form.maskImage);
   const inputImages = await Promise.all(
-    form.inputImages.map((image, index) => centerCropAssetToPng(image, target, `input-${index + 1}-${target.width}x${target.height}.png`)),
+    form.inputImages.map((image, index) =>
+      centerCropAssetToPng(
+        image,
+        target,
+        `input-${index + 1}-${target.width}x${target.height}.png`,
+      ),
+    ),
   );
-  const maskImage = await centerCropAssetToPng(form.maskImage, target, `mask-${target.width}x${target.height}.png`);
-  const apiMaskImage = await buildApiMaskFromUiMask(form.maskImage, target, `api-mask-${target.width}x${target.height}.png`);
+  const maskImage = await centerCropAssetToPng(
+    form.maskImage,
+    target,
+    `mask-${target.width}x${target.height}.png`,
+  );
+  const apiMaskImage = await buildApiMaskFromUiMask(
+    form.maskImage,
+    target,
+    `api-mask-${target.width}x${target.height}.png`,
+  );
 
   return {
     form: {
@@ -1460,9 +1861,9 @@ async function prepareRequestForm(form: GenerateForm): Promise<{ form: GenerateF
     },
     logs: [
       `frontend: edit-mask normalization target=${target.width}x${target.height} crop=center output_format=png`,
-      `frontend: input_sizes_before=${inputSizes.map((size) => `${size.width}x${size.height}`).join(', ')}`,
+      `frontend: input_sizes_before=${inputSizes.map((size) => `${size.width}x${size.height}`).join(", ")}`,
       `frontend: mask_size_before=${maskSize.width}x${maskSize.height}`,
-      `frontend: input_sizes_after=${inputImages.map((image) => `${image.width}x${image.height}`).join(', ')}`,
+      `frontend: input_sizes_after=${inputImages.map((image) => `${image.width}x${image.height}`).join(", ")}`,
       `frontend: ui_mask_size_after=${maskImage.width}x${maskImage.height}`,
       `frontend: api_mask_size_after=${apiMaskImage.width}x${apiMaskImage.height} mode=rgba-rgb-alpha-same black-transparent=edit white-opaque=protected`,
     ],
@@ -1480,35 +1881,48 @@ function parseOutputSize(size: string) {
   };
 }
 
-async function centerCropAssetToPng(asset: ImageAsset, target: { width: number; height: number }, name: string): Promise<ImageAsset> {
+async function centerCropAssetToPng(
+  asset: ImageAsset,
+  target: { width: number; height: number },
+  name: string,
+): Promise<ImageAsset> {
   const canvas = await centerCropAssetToCanvas(asset, target);
 
   return {
     id: crypto.randomUUID(),
     name,
-    mimeType: 'image/png',
-    dataUrl: canvas.toDataURL('image/png'),
+    mimeType: "image/png",
+    dataUrl: canvas.toDataURL("image/png"),
     width: target.width,
     height: target.height,
   };
 }
 
-async function buildApiMaskFromUiMask(asset: ImageAsset, target: { width: number; height: number }, name: string): Promise<ImageAsset> {
+async function buildApiMaskFromUiMask(
+  asset: ImageAsset,
+  target: { width: number; height: number },
+  name: string,
+): Promise<ImageAsset> {
   const sourceCanvas = await centerCropAssetToCanvas(asset, target);
-  const sourceContext = sourceCanvas.getContext('2d');
+  const sourceContext = sourceCanvas.getContext("2d");
   if (!sourceContext) {
-    throw new Error('Canvas context is unavailable.');
+    throw new Error("Canvas context is unavailable.");
   }
 
-  const outputCanvas = document.createElement('canvas');
+  const outputCanvas = document.createElement("canvas");
   outputCanvas.width = target.width;
   outputCanvas.height = target.height;
-  const outputContext = outputCanvas.getContext('2d');
+  const outputContext = outputCanvas.getContext("2d");
   if (!outputContext) {
-    throw new Error('Canvas context is unavailable.');
+    throw new Error("Canvas context is unavailable.");
   }
 
-  const sourceData = sourceContext.getImageData(0, 0, target.width, target.height);
+  const sourceData = sourceContext.getImageData(
+    0,
+    0,
+    target.width,
+    target.height,
+  );
   const outputData = outputContext.createImageData(target.width, target.height);
   for (let index = 0; index < sourceData.data.length; index += 4) {
     const painted = sourceData.data[index + 3] > 0;
@@ -1523,9 +1937,9 @@ async function buildApiMaskFromUiMask(asset: ImageAsset, target: { width: number
   return {
     id: crypto.randomUUID(),
     name,
-    mimeType: 'image/png',
-    dataUrl: outputCanvas.toDataURL('image/png'),
-    maskEncoding: 'api-alpha',
+    mimeType: "image/png",
+    dataUrl: outputCanvas.toDataURL("image/png"),
+    maskEncoding: "api-alpha",
     width: target.width,
     height: target.height,
   };
@@ -1533,12 +1947,12 @@ async function buildApiMaskFromUiMask(asset: ImageAsset, target: { width: number
 
 async function buildUiMaskFromApiMask(asset: ImageAsset): Promise<ImageAsset> {
   const image = await loadImageElement(asset.dataUrl);
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, image.naturalWidth || image.width);
   canvas.height = Math.max(1, image.naturalHeight || image.height);
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error('Canvas context is unavailable.');
+    throw new Error("Canvas context is unavailable.");
   }
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   const source = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -1555,42 +1969,48 @@ async function buildUiMaskFromApiMask(asset: ImageAsset): Promise<ImageAsset> {
   return {
     ...asset,
     id: crypto.randomUUID(),
-    name: asset.name || 'drawn-mask.png',
-    mimeType: 'image/png',
-    dataUrl: canvas.toDataURL('image/png'),
-    maskEncoding: 'ui-red',
+    name: asset.name || "drawn-mask.png",
+    mimeType: "image/png",
+    dataUrl: canvas.toDataURL("image/png"),
+    maskEncoding: "ui-red",
     width: canvas.width,
     height: canvas.height,
   };
 }
 
-async function centerCropAssetToCanvas(asset: ImageAsset, target: { width: number; height: number }) {
+async function centerCropAssetToCanvas(
+  asset: ImageAsset,
+  target: { width: number; height: number },
+) {
   const image = await loadImageElement(asset.dataUrl);
-  const canvas = document.createElement('canvas');
+  const canvas = document.createElement("canvas");
   canvas.width = target.width;
   canvas.height = target.height;
-  const context = canvas.getContext('2d');
+  const context = canvas.getContext("2d");
   if (!context) {
-    throw new Error('Canvas context is unavailable.');
+    throw new Error("Canvas context is unavailable.");
   }
 
   const sourceWidth = image.naturalWidth || image.width;
   const sourceHeight = image.naturalHeight || image.height;
-  const scale = Math.max(target.width / sourceWidth, target.height / sourceHeight);
+  const scale = Math.max(
+    target.width / sourceWidth,
+    target.height / sourceHeight,
+  );
   const drawWidth = sourceWidth * scale;
   const drawHeight = sourceHeight * scale;
   const dx = (target.width - drawWidth) / 2;
   const dy = (target.height - drawHeight) / 2;
   context.clearRect(0, 0, target.width, target.height);
   context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = 'high';
+  context.imageSmoothingQuality = "high";
   context.drawImage(image, dx, dy, drawWidth, drawHeight);
 
   return canvas;
 }
 
 function imageFilesFromList(fileList: FileList | File[]) {
-  return Array.from(fileList).filter((file) => file.type.startsWith('image/'));
+  return Array.from(fileList).filter((file) => file.type.startsWith("image/"));
 }
 
 function imageFilesFromClipboard(data: DataTransfer | null) {
@@ -1604,7 +2024,7 @@ function imageFilesFromClipboard(data: DataTransfer | null) {
   }
 
   return Array.from(data.items)
-    .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+    .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
     .map((item) => item.getAsFile())
     .filter((file): file is File => Boolean(file));
 }
@@ -1613,13 +2033,13 @@ async function validateRequest(
   form: GenerateForm,
   t: (key: string, replacements?: Record<string, string | number>) => string,
 ) {
-  if (form.mode !== 'text' && form.inputImages.length === 0) {
-    throw new Error(t('message.needInputImage'));
+  if (form.mode !== "text" && form.inputImages.length === 0) {
+    throw new Error(t("message.needInputImage"));
   }
-  if (form.mode === 'edit-mask' && !form.maskImage) {
-    throw new Error(t('message.needMaskImage'));
+  if (form.mode === "edit-mask" && !form.maskImage) {
+    throw new Error(t("message.needMaskImage"));
   }
-  if (form.mode === 'edit-mask' && form.maskImage) {
+  if (form.mode === "edit-mask" && form.maskImage) {
     await ensureMaskSizeMatches(form.inputImages[0], form.maskImage, t);
   }
 }
@@ -1631,16 +2051,21 @@ async function ensureMaskSizeMatches(
 ) {
   const inputSize = await imageAssetSize(inputImage);
   const maskSize = await imageAssetSize(maskImage);
-  if (inputSize.width === maskSize.width && inputSize.height === maskSize.height) {
+  if (
+    inputSize.width === maskSize.width &&
+    inputSize.height === maskSize.height
+  ) {
     return;
   }
 
-  throw new Error(t('message.maskSizeMismatch', {
-    inputWidth: inputSize.width,
-    inputHeight: inputSize.height,
-    maskWidth: maskSize.width,
-    maskHeight: maskSize.height,
-  }));
+  throw new Error(
+    t("message.maskSizeMismatch", {
+      inputWidth: inputSize.width,
+      inputHeight: inputSize.height,
+      maskWidth: maskSize.width,
+      maskHeight: maskSize.height,
+    }),
+  );
 }
 
 async function imageAssetSize(image: ImageAsset) {
@@ -1655,7 +2080,7 @@ function formatErrorText(error: unknown) {
   if (error instanceof Error) {
     return error.message;
   }
-  if (typeof error === 'string') {
+  if (typeof error === "string") {
     return error;
   }
   try {
@@ -1665,12 +2090,17 @@ function formatErrorText(error: unknown) {
   }
 }
 
-function withTimeout<T>(promise: Promise<T>, milliseconds: number, message: string): Promise<T> {
+function withTimeout<T>(
+  promise: Promise<T>,
+  milliseconds: number,
+  message: string,
+): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(message)), milliseconds);
-    promise
-      .then(resolve, reject)
-      .finally(() => window.clearTimeout(timer));
+    const timer = window.setTimeout(
+      () => reject(new Error(message)),
+      milliseconds,
+    );
+    promise.then(resolve, reject).finally(() => window.clearTimeout(timer));
   });
 }
 
@@ -1680,35 +2110,57 @@ function stripHistoryItemForStorage(item: HistoryItem): HistoryItem {
     settings: {
       ...item.settings,
       inputImages: item.settings.inputImages.map(stripImageAssetData),
-      maskImage: item.settings.maskImage ? stripImageAssetData(item.settings.maskImage) : null,
+      maskImage: item.settings.maskImage
+        ? stripImageAssetData(item.settings.maskImage)
+        : null,
     },
-    images: item.images.map((image) => ({ ...image, dataUrl: '' })),
+    images: item.images.map((image) => ({ ...image, dataUrl: "" })),
   };
 }
 
-function normalizeStoredHistoryItem(item: HistoryItem, appConfig: AppConfig): HistoryItem {
+function normalizeStoredHistoryItem(
+  item: HistoryItem,
+  appConfig: AppConfig,
+): HistoryItem {
   return {
     ...item,
-    settings: normalizeFormAgainstConfig({
-      ...buildInitialForm(appConfig),
-      ...item.settings,
-      inputImages: (item.settings?.inputImages ?? []).map((image) => ({ ...image, dataUrl: image.dataUrl ?? '' })),
-      maskImage: item.settings?.maskImage ? { ...item.settings.maskImage, dataUrl: item.settings.maskImage.dataUrl ?? '' } : null,
-    }, appConfig),
-    images: (item.images ?? []).map((image) => ({ ...image, dataUrl: image.dataUrl ?? '' })),
+    settings: normalizeFormAgainstConfig(
+      {
+        ...buildInitialForm(appConfig),
+        ...item.settings,
+        inputImages: (item.settings?.inputImages ?? []).map((image) => ({
+          ...image,
+          dataUrl: image.dataUrl ?? "",
+        })),
+        maskImage: item.settings?.maskImage
+          ? {
+              ...item.settings.maskImage,
+              dataUrl: item.settings.maskImage.dataUrl ?? "",
+            }
+          : null,
+      },
+      appConfig,
+    ),
+    images: (item.images ?? []).map((image) => ({
+      ...image,
+      dataUrl: image.dataUrl ?? "",
+    })),
   };
 }
 
 function stripImageAssetData(image: ImageAsset): ImageAsset {
   return {
     ...image,
-    dataUrl: '',
+    dataUrl: "",
   };
 }
 
 function playCompletionSound() {
   try {
-    const AudioContextClass = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
     if (!AudioContextClass) {
       return;
     }
@@ -1724,10 +2176,15 @@ function playCompletionSound() {
   }
 }
 
-function playTone(audioContext: AudioContext, start: number, frequency: number, duration: number) {
+function playTone(
+  audioContext: AudioContext,
+  start: number,
+  frequency: number,
+  duration: number,
+) {
   const oscillator = audioContext.createOscillator();
   const gain = audioContext.createGain();
-  oscillator.type = 'sine';
+  oscillator.type = "sine";
   oscillator.frequency.setValueAtTime(frequency, start);
   gain.gain.setValueAtTime(0.0001, start);
   gain.gain.exponentialRampToValueAtTime(0.12, start + 0.02);
@@ -1739,26 +2196,26 @@ function playTone(audioContext: AudioContext, start: number, frequency: number, 
 }
 
 function extractDebugLogs(errorText: string) {
-  const marker = 'Debug logs:\n';
+  const marker = "Debug logs:\n";
   const index = errorText.indexOf(marker);
   if (index === -1) {
     return [];
   }
   return errorText
     .slice(index + marker.length)
-    .split('\n')
+    .split("\n")
     .filter(Boolean)
-    .map((line) => `backend: ${line.replace(/^backend: /, '')}`);
+    .map((line) => `backend: ${line.replace(/^backend: /, "")}`);
 }
 
 function buildFrontendRequestPreview(form: GenerateForm) {
-  if (form.mode === 'edit-mask') {
+  if (form.mode === "edit-mask") {
     const fields: Record<string, unknown> = {
-      endpoint: '/v1/images/edits',
-      contentType: 'multipart/form-data',
+      endpoint: "/v1/images/edits",
+      contentType: "multipart/form-data",
       model: form.model,
       prompt: form.prompt,
-      'image[]': form.inputImages.map((image) => ({
+      "image[]": form.inputImages.map((image) => ({
         name: image.name,
         media_type: image.mimeType,
       })),
@@ -1769,22 +2226,22 @@ function buildFrontendRequestPreview(form: GenerateForm) {
           }
         : null,
     };
-    if (form.size !== 'auto') {
+    if (form.size !== "auto") {
       fields.size = form.size;
     }
-    if (form.quality !== 'auto') {
+    if (form.quality !== "auto") {
       fields.quality = form.quality;
     }
-    if (form.outputFormat !== 'auto') {
+    if (form.outputFormat !== "auto") {
       fields.output_format = form.outputFormat;
     }
-    if (form.background !== 'auto') {
+    if (form.background !== "auto") {
       fields.background = form.background;
     }
-    if (form.moderation !== 'auto') {
+    if (form.moderation !== "auto") {
       fields.moderation = form.moderation;
     }
-    if (form.outputFormat === 'jpeg' || form.outputFormat === 'webp') {
+    if (form.outputFormat === "jpeg" || form.outputFormat === "webp") {
       fields.output_compression = form.outputCompression;
     }
 
@@ -1792,46 +2249,46 @@ function buildFrontendRequestPreview(form: GenerateForm) {
   }
 
   const tool: Record<string, unknown> = {
-    type: 'image_generation',
+    type: "image_generation",
   };
-  if (form.quality !== 'auto') {
+  if (form.quality !== "auto") {
     tool.quality = form.quality;
   }
-  if (form.outputFormat !== 'auto') {
+  if (form.outputFormat !== "auto") {
     tool.output_format = form.outputFormat;
   }
-  if (form.background !== 'auto') {
+  if (form.background !== "auto") {
     tool.background = form.background;
   }
 
-  if (form.size !== 'auto') {
+  if (form.size !== "auto") {
     tool.size = form.size;
   }
-  if (form.moderation !== 'auto') {
+  if (form.moderation !== "auto") {
     tool.moderation = form.moderation;
   }
-  if (form.action !== 'auto') {
+  if (form.action !== "auto") {
     tool.action = form.action;
   }
-  if (form.outputFormat === 'jpeg' || form.outputFormat === 'webp') {
+  if (form.outputFormat === "jpeg" || form.outputFormat === "webp") {
     tool.output_compression = form.outputCompression;
   }
   const input =
-    form.mode === 'text'
+    form.mode === "text"
       ? form.prompt
       : [
           {
-            role: 'user',
+            role: "user",
             content: [
               {
-                type: 'input_text',
+                type: "input_text",
                 text: form.prompt,
               },
               ...form.inputImages.map((image) => ({
-                type: 'input_image',
+                type: "input_image",
                 image_url:
-                  form.mode === 'edit-mask'
-                    ? '<uploaded input file id>'
+                  form.mode === "edit-mask"
+                    ? "<uploaded input file id>"
                     : redactDataUrl(image.dataUrl),
                 media_type: image.mimeType,
                 name: image.name,
@@ -1846,23 +2303,23 @@ function buildFrontendRequestPreview(form: GenerateForm) {
     tools: [tool],
   };
 
-  body.tool_choice = { type: 'image_generation' };
+  body.tool_choice = { type: "image_generation" };
 
   return JSON.stringify(body, null, 2);
 }
 
 function redactDataUrl(value: string) {
-  const marker = ';base64,';
+  const marker = ";base64,";
   const index = value.indexOf(marker);
   if (index === -1) {
-    return '<invalid data url>';
+    return "<invalid data url>";
   }
   const prefix = value.slice(0, index + marker.length);
   const encoded = value.slice(index + marker.length);
   return `${prefix}<base64 omitted: ${encoded.length} chars>`;
 }
 
-function ensureTauri(message = fallbackLocale['error.tauriOnly']) {
+function ensureTauri(message = fallbackLocale["error.tauriOnly"]) {
   if (!isTauri) {
     throw new Error(message);
   }
@@ -1878,7 +2335,7 @@ function readFileAsAsset(file: File): Promise<ImageAsset> {
         resolve({
           id: crypto.randomUUID(),
           name: file.name,
-          mimeType: file.type || 'image/png',
+          mimeType: file.type || "image/png",
           dataUrl,
           width: size.width,
           height: size.height,
@@ -1892,7 +2349,9 @@ function readFileAsAsset(file: File): Promise<ImageAsset> {
   });
 }
 
-function readImageSize(dataUrl: string): Promise<{ width: number; height: number }> {
+function readImageSize(
+  dataUrl: string,
+): Promise<{ width: number; height: number }> {
   return loadImageElement(dataUrl).then((image) => ({
     width: Math.max(1, image.naturalWidth || image.width),
     height: Math.max(1, image.naturalHeight || image.height),
@@ -1903,7 +2362,7 @@ function loadImageElement(dataUrl: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error('Failed to read image size.'));
+    image.onerror = () => reject(new Error("Failed to read image size."));
     image.src = dataUrl;
   });
 }
@@ -1921,8 +2380,10 @@ function SelectField({ label, value, options, onChange }: SelectFieldProps) {
       <span>{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
         {options.map((option) => {
-          const optionValue = typeof option === 'string' ? option : option.value;
-          const optionLabel = typeof option === 'string' ? option : option.label;
+          const optionValue =
+            typeof option === "string" ? option : option.value;
+          const optionLabel =
+            typeof option === "string" ? option : option.label;
           return (
             <option key={optionValue} value={optionValue}>
               {optionLabel}

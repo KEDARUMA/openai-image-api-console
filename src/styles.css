@@ -62,8 +62,11 @@ button {
   gap: 12px;
 }
 
-.brand svg {
-  color: var(--accent);
+.brand-icon {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  object-fit: contain;
 }
 
 .brand h1,
@@ -503,6 +506,15 @@ button {
 
 .primary-action:hover {
   background: var(--accent-strong);
+}
+
+.primary-action.stop-action {
+  border-color: #8f2d28;
+  background: #b63d35;
+}
+
+.primary-action.stop-action:hover {
+  background: #9f312b;
 }
 
 .primary-action:disabled {

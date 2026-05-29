@@ -6,6 +6,10 @@ OpenAI Image API Console is an unofficial desktop tool for using OpenAI image ge
 
 It is built with Tauri, React, and Vite, and can be built as a desktop app for macOS, Windows, and Linux.
 
+## Download
+
+[Download the latest release](https://github.com/KEDARUMA/openai-image-api-console/releases)
+
 ## Features
 
 - Generate images from text prompts

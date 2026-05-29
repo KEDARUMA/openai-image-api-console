@@ -10,6 +10,16 @@ It is built with Tauri, React, and Vite, and can be built as a desktop app for m
 
 [Download the latest release](https://github.com/KEDARUMA/openai-image-api-console/releases)
 
+Choose the file that matches your OS:
+
+- macOS Apple Silicon: `*_aarch64.dmg`
+- macOS Intel: `*_x64.dmg`
+- Windows: `*_x64-setup.exe`
+- Ubuntu / Debian: `*_amd64.deb`
+- Fedora / RHEL: `*.x86_64.rpm`
+- Other Linux: `*_amd64.AppImage`
+- `*.app.tar.gz` is usually not needed.
+
 ## Features
 
 - Generate images from text prompts

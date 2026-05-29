@@ -2,9 +2,9 @@
 
 English | [日本語](README.ja.md)
 
-OpenAI Image API Console is an unofficial desktop tool for using OpenAI image generation and image editing APIs.
+OpenAI Image API Console is an unofficial desktop app for using OpenAI image generation and image editing APIs.
 
-It is built with Tauri, React, and Vite, and can be built as a desktop app for macOS, Windows, and Linux.
+It gives you a local GUI for text-to-image generation, image-to-image generation, mask editing, transparent PNG output, model options, and generation history. It is built with Tauri, React, and Vite, and is available for macOS, Windows, and Linux.
 
 ## Download
 
@@ -20,6 +20,23 @@ Choose the file that matches your OS:
 - Other Linux: `*_amd64.AppImage`
 - `*.app.tar.gz` is usually not needed.
 
+## Quick Start
+
+1. Download the release asset for your OS.
+2. Launch the app.
+3. Open settings and enter your OpenAI API key.
+4. Choose a mode, model, size, quality, background, and output format.
+5. Enter a prompt or select input images, then generate an image.
+
+## What You Can Do
+
+- Create images from text prompts.
+- Generate variations from input images.
+- Edit images with alpha-channel PNG masks.
+- Generate transparent-background PNG images.
+- Compare model, size, quality, and output format settings.
+- Review previously generated images from local history.
+
 ## Features
 
 - Generate images from text prompts
@@ -31,6 +48,10 @@ Choose the file that matches your OS:
 - Save generation history locally
 - Switch between Japanese and English UI text
 - Open the OpenAI API Keys and Billing pages from the settings screen
+
+## macOS Notice
+
+This app is currently distributed without Apple Developer ID signing or notarization. macOS may show a security warning the first time you open it.
 
 ## Screenshots
 
@@ -45,54 +66,6 @@ Choose the file that matches your OS:
 ### Edit with Mask
 
 ![Edit with Mask](docs/images/edit-with-mask.png)
-
-## Requirements
-
-- Node.js
-- npm
-- Rust / Cargo
-- OS-specific dependencies required by Tauri builds
-
-Check the official Tauri documentation for OS-specific build requirements.
-
-## Setup
-
-Install dependencies.
-
-```bash
-npm install
-```
-
-## Development
-
-```bash
-npm run tauri:dev
-```
-
-To run only the frontend development server:
-
-```bash
-npm run dev
-```
-
-## Build
-
-Build the distributable desktop app.
-
-```bash
-npm run tauri:build
-```
-
-Tauri runs `npm run build` before packaging and bundles the generated `dist/` directory into the app.
-
-## Usage
-
-1. Launch the app.
-2. Open settings and enter your OpenAI API key.
-3. Open the API Keys or Billing page if you need to create a key or check billing status.
-4. Choose the mode, model, size, quality, background, output format, and other options.
-5. Enter a prompt or select input images, then generate an image.
-6. Generated images are saved locally and can be reviewed from the history.
 
 ## API Key
 
@@ -118,6 +91,47 @@ For mask editing, the app handles alpha-channel PNG masks sent to the API. Trans
 - Using the API requires an OpenAI API key and valid billing setup.
 - Generated results and API costs may vary depending on the selected model, quality, size, input, and OpenAI-side changes.
 - Do not include files containing secrets in a public repository.
+
+## Development
+
+### Requirements
+
+- Node.js
+- npm
+- Rust / Cargo
+- OS-specific dependencies required by Tauri builds
+
+Check the official Tauri documentation for OS-specific build requirements.
+
+### Setup
+
+Install dependencies.
+
+```bash
+npm install
+```
+
+### Run locally
+
+```bash
+npm run tauri:dev
+```
+
+To run only the frontend development server:
+
+```bash
+npm run dev
+```
+
+### Build
+
+Build the distributable desktop app.
+
+```bash
+npm run tauri:build
+```
+
+Tauri runs `npm run build` before packaging and bundles the generated `dist/` directory into the app.
 
 ## License
 

@@ -77,21 +77,21 @@ The API key is stored locally in the app settings. Do not include API keys in pu
 
 The model selector shows model support and pricing information for each model.
 
-The table below summarizes models that appear usable for image generation or image editing in the official OpenAI documentation. `✅` means supported, `❌` means not supported, and `❓` means check required.
+The table below summarizes model support confirmed in the project checklist. `✅` means supported, and `❌` means not supported.
 
-| Model ID | Family | Text / Image to Image | Edit with Mask | Available in this app | Alpha channel support | Pricing |
+| Model ID | Family | Text to Image | Image to Image | Edit with Mask | Alpha channel support | Pricing |
 |---|---|---|---|---|---|---|
-| `gpt-image-2` | GPT Image 2 | ✅ | ✅ | ✅ | Mask alpha: ✅ / transparent background: ❌ | Image: input $8.00 / cached $2.00 / output $30.00; Text: input $5.00 / cached $1.25 |
-| `gpt-image-1.5` | GPT Image 1.5 | ✅ | ✅ | ✅ | Mask alpha: ✅ / transparent background: ❓ | Image: input $8.00 / cached $2.00 / output $32.00; Text: input $5.00 / cached $1.25 / output $10.00 |
-| `gpt-image-1` | GPT Image 1 | ✅ | ✅ | ✅ | Mask alpha: ✅ / transparent background: ❓ | App display: input $10.00 / output $40.00 |
-| `gpt-image-1-mini` | GPT Image 1 mini | ✅ | ✅ | ✅ | Mask alpha: ✅ / transparent background: ❓ | Image: input $2.50 / cached $0.25 / output $8.00; Text: input $2.00 / cached $0.20 |
-| `chatgpt-image-latest` | ChatGPT Image | ✅ | ❓ | ✅ | ❓ | App display: input $8.00 / output $32.00 |
-| `gpt-5.5` | GPT-5.5 | ✅ | ❓ | ✅ | ❓ | Standard short context: input $5.00 / cached $0.50 / output $30.00 |
-| `gpt-5.4` | GPT-5.4 | ✅ | ❓ | ❌ | ❓ | Standard short context: input $2.50 / cached $0.25 / output $15.00 |
-| `gpt-5.4-mini` | GPT-5.4 mini | ✅ | ❓ | ✅ | ❓ | Standard short context: input $0.75 / cached $0.075 / output $4.50 |
-| `gpt-5.4-nano` | GPT-5.4 nano | ✅ | ❓ | ✅ | ❓ | Standard short context: input $0.20 / cached $0.02 / output $1.25 |
-| `gpt-5.2` | GPT-5.2 | ✅ | ❓ | ✅ | ❓ | App display: input $1.75 / output $14.00 |
-| `gpt-5-nano` | GPT-5 nano | ✅ | ❓ | ✅ | ❓ | App display: input $0.05 / output $0.40 |
+| `gpt-image-2` | GPT Image 2 | ✅ | ✅ | ✅ | ✅ | Image: input $8.00 / cached $2.00 / output $30.00; Text: input $5.00 / cached $1.25 |
+| `gpt-image-1.5` | GPT Image 1.5 | ✅ | ✅ | ✅ | ✅ | Image: input $8.00 / cached $2.00 / output $32.00; Text: input $5.00 / cached $1.25 / output $10.00 |
+| `gpt-image-1` | GPT Image 1 | ✅ | ✅ | ✅ | ✅ | App display: input $10.00 / output $40.00 |
+| `gpt-image-1-mini` | GPT Image 1 mini | ✅ | ✅ | ✅ | ✅ | Image: input $2.50 / cached $0.25 / output $8.00; Text: input $2.00 / cached $0.20 |
+| `chatgpt-image-latest` | ChatGPT Image | ✅ | ✅ | ✅ | ✅ | App display: input $8.00 / output $32.00 |
+| `gpt-5.5` | GPT-5.5 | ✅ | ✅ | ✅ | ❌ | Standard short context: input $5.00 / cached $0.50 / output $30.00 |
+| `gpt-5.4` | GPT-5.4 | ✅ | ✅ | ✅ | ❌ | Standard short context: input $2.50 / cached $0.25 / output $15.00 |
+| `gpt-5.2` | GPT-5.2 | ✅ | ✅ | ✅ | ❌ | App display: input $1.75 / output $14.00 |
+| `gpt-5.4-mini` | GPT-5.4 mini | ✅ | ✅ | ✅ | ❌ | Standard short context: input $0.75 / cached $0.075 / output $4.50 |
+| `gpt-5.4-nano` | GPT-5.4 nano | ✅ | ✅ | ✅ | ❌ | Standard short context: input $0.20 / cached $0.02 / output $1.25 |
+| `gpt-5-nano` | GPT-5 nano | ✅ | ✅ | ✅ | ❌ | App display: input $0.05 / output $0.40 |
 
 The image generation models clearly confirmed in the official pricing information include `gpt-image-2`, `gpt-image-1.5`, and `gpt-image-1-mini`. `App display` prices are display values from the app configuration.
 

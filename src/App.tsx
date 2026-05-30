@@ -19,6 +19,7 @@ import {
   FileText,
   History,
   Image as ImageIcon,
+  Palette,
   Play,
   Save,
   Settings,
@@ -176,6 +177,9 @@ const fallbackLocale: LocaleText = {
   "action.openApiKeys": "API Keys",
   "action.close": "Close",
   "action.save": "Save",
+  "action.cancel": "Cancel",
+  "action.clearHistory": "Clear history",
+  "action.deleteHistory": "Delete history",
   "action.createBlankCanvas": "Blank Image",
   "action.loadMask": "Load Mask",
   "action.clear": "Clear",
@@ -194,6 +198,7 @@ const fallbackLocale: LocaleText = {
   "status.copiedError": "Copied error details to clipboard.",
   "status.savedAs": "Saved As: {path}",
   "status.loadedHistory": "Loaded settings and images from history.",
+  "status.clearedHistory": "History deleted.",
   "status.waitingBackend":
     "Still waiting for backend response after {seconds}s. Do not click Generate again.",
   "error.backendTimeout": "Backend response timeout after {seconds}s.",
@@ -204,6 +209,9 @@ const fallbackLocale: LocaleText = {
     "Mask size must match input image size. Input: {inputWidth}x{inputHeight}, mask: {maskWidth}x{maskHeight}.",
   "modal.error.title": "Image generation failed",
   "modal.settings.title": "Settings",
+  "modal.clearHistory.title": "Delete history?",
+  "modal.clearHistory.message":
+    "History entries, input images, and mask images will be deleted. Generated image files will remain.",
   "aria.settings": "Settings",
   "aria.composer": "Generation settings",
   "aria.preview": "Preview",
@@ -211,6 +219,7 @@ const fallbackLocale: LocaleText = {
   "aria.debug": "Debug log",
   "aria.modeTabs": "Generation mode",
   "aria.error": "Image generation error",
+  "aria.clearHistory": "Delete history confirmation",
   "title.close": "Close",
   "title.delete": "Delete",
   "title.finder": "Show in Folder",
@@ -284,6 +293,8 @@ const fallbackAppConfig: AppConfig = {
 
 function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [clearHistoryConfirmOpen, setClearHistoryConfirmOpen] =
+    useState(false);
   const [settings, setSettings] = useState<AppSettings>({
     apiKey: "",
     language: "en",
@@ -307,6 +318,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [brushSize, setBrushSize] = useState(44);
+  const [maskColor, setMaskColor] = useState("#ff0000");
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
   const [debugOpen, setDebugOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
@@ -819,6 +831,19 @@ function App() {
     setMessage(t("status.loadedHistory"));
   }
 
+  async function clearHistory() {
+    try {
+      ensureTauri(t("error.tauriOnly"));
+      await tauriInvoke("save_history", { history: [] });
+      setHistory([]);
+      setSelectedHistoryId(null);
+      setClearHistoryConfirmOpen(false);
+      setMessage(t("status.clearedHistory"));
+    } catch (error) {
+      notifyError(error);
+    }
+  }
+
   async function loadHistoryImages(items: HistoryItem[]) {
     return Promise.all(items.map(hydrateHistoryItemAssets));
   }
@@ -885,7 +910,7 @@ function App() {
     if (loaded.maskEncoding !== "api-alpha" || !loaded.dataUrl) {
       return loaded;
     }
-    return buildUiMaskFromApiMask(loaded);
+    return buildUiMaskFromApiMask(loaded, maskColor);
   }
 
   return (
@@ -981,7 +1006,9 @@ function App() {
               baseImage={form.inputImages[0] ?? null}
               maskImage={form.maskImage}
               brushSize={brushSize}
+              maskColor={maskColor}
               onBrushSizeChange={setBrushSize}
+              onMaskColorChange={setMaskColor}
               onMaskFile={(files) => addFiles(files, "mask")}
               onMaskChange={(maskImage) => updateForm("maskImage", maskImage)}
               onCreateBlankInput={createBlankInputImage}
@@ -1105,9 +1132,21 @@ function App() {
         </section>
 
         <aside className="history-panel" aria-label={t("aria.history")}>
-          <div className="panel-heading">
-            <History size={18} />
-            <h2>{t("section.history")}</h2>
+          <div className="history-panel-heading">
+            <div className="panel-heading">
+              <History size={18} />
+              <h2>{t("section.history")}</h2>
+            </div>
+            {history.length > 0 && (
+              <button
+                className="icon-button history-clear-button"
+                type="button"
+                onClick={() => setClearHistoryConfirmOpen(true)}
+                title={t("action.clearHistory")}
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
           </div>
 
           {history.length === 0 ? (
@@ -1236,6 +1275,46 @@ function App() {
                 onClick={() => setErrorDialog(null)}
               >
                 <span>{t("action.close")}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {clearHistoryConfirmOpen && (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="confirm-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-label={t("aria.clearHistory")}
+          >
+            <div className="modal-heading">
+              <h2>{t("modal.clearHistory.title")}</h2>
+              <button
+                type="button"
+                onClick={() => setClearHistoryConfirmOpen(false)}
+                title={t("title.close")}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p>{t("modal.clearHistory.message")}</p>
+            <div className="modal-actions">
+              <button
+                className="secondary-action compact"
+                type="button"
+                onClick={() => setClearHistoryConfirmOpen(false)}
+              >
+                <span>{t("action.cancel")}</span>
+              </button>
+              <button
+                className="danger-action compact"
+                type="button"
+                onClick={clearHistory}
+              >
+                <Trash2 size={16} />
+                <span>{t("action.deleteHistory")}</span>
               </button>
             </div>
           </section>
@@ -1380,7 +1459,9 @@ function MaskPanel({
   baseImage,
   maskImage,
   brushSize,
+  maskColor,
   onBrushSizeChange,
+  onMaskColorChange,
   onMaskFile,
   onMaskChange,
   onCreateBlankInput,
@@ -1389,7 +1470,9 @@ function MaskPanel({
   baseImage: ImageAsset | null;
   maskImage: ImageAsset | null;
   brushSize: number;
+  maskColor: string;
   onBrushSizeChange: (value: number) => void;
+  onMaskColorChange: (value: string) => void;
   onMaskFile: (files: FileList | File[]) => void;
   onMaskChange: (maskImage: ImageAsset | null) => void;
   onCreateBlankInput: () => void;
@@ -1398,6 +1481,12 @@ function MaskPanel({
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawingRef = useRef(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const colorRef = useRef<HTMLInputElement | null>(null);
+  const [brushPreview, setBrushPreview] = useState<{
+    x: number;
+    y: number;
+    size: number;
+  } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -1428,7 +1517,7 @@ function MaskPanel({
         if (cancelled) {
           return;
         }
-        context.drawImage(mask, 0, 0, canvas.width, canvas.height);
+        drawMaskImageWithColor(context, mask, canvas.width, canvas.height, maskColor);
       };
       mask.src = maskImage.dataUrl;
     };
@@ -1436,16 +1525,12 @@ function MaskPanel({
     return () => {
       cancelled = true;
     };
-  }, [baseImage?.id, maskImage?.id]);
+  }, [baseImage?.id, maskImage?.id, maskColor]);
 
-  function draw(event: PointerEvent<HTMLCanvasElement>) {
-    if (!drawingRef.current) {
-      return;
-    }
+  function canvasPoint(event: PointerEvent<HTMLCanvasElement>) {
     const canvas = canvasRef.current;
-    const context = canvas?.getContext("2d");
-    if (!canvas || !context) {
-      return;
+    if (!canvas) {
+      return null;
     }
     const rect = canvas.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
@@ -1453,10 +1538,47 @@ function MaskPanel({
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
     const brushScale = (scaleX + scaleY) / 2;
+    return { canvas, x, y, brushScale };
+  }
+
+  function updateBrushPreview(event: PointerEvent<HTMLCanvasElement>) {
+    const point = canvasPoint(event);
+    if (!point) {
+      return;
+    }
+    const wrap = point.canvas.parentElement;
+    const wrapRect = wrap?.getBoundingClientRect();
+    if (!wrapRect) {
+      return;
+    }
+    setBrushPreview({
+      x: event.clientX - wrapRect.left,
+      y: event.clientY - wrapRect.top,
+      size: brushSize / 2,
+    });
+  }
+
+  function draw(event: PointerEvent<HTMLCanvasElement>) {
+    event.preventDefault();
+    updateBrushPreview(event);
+    if (!drawingRef.current) {
+      return;
+    }
+    const point = canvasPoint(event);
+    const context = point?.canvas.getContext("2d");
+    if (!point || !context) {
+      return;
+    }
     context.globalCompositeOperation = "source-over";
-    context.fillStyle = "rgba(255, 0, 0, 1)";
+    context.fillStyle = maskColor;
     context.beginPath();
-    context.arc(x, y, (brushSize * brushScale) / 2, 0, Math.PI * 2);
+    context.arc(
+      point.x,
+      point.y,
+      (brushSize * point.brushScale) / 2,
+      0,
+      Math.PI * 2,
+    );
     context.fill();
   }
 
@@ -1502,6 +1624,18 @@ function MaskPanel({
           <Eraser size={15} />
           <span>{t("action.clear")}</span>
         </button>
+        <button
+          type="button"
+          className="mask-color-button"
+          onClick={() => colorRef.current?.click()}
+          title="Mask color"
+        >
+          <Palette size={15} />
+          <span
+            className="mask-color-swatch"
+            style={{ backgroundColor: maskColor }}
+          />
+        </button>
         <label>
           <Brush size={15} />
           <span>{brushSize}px</span>
@@ -1521,14 +1655,27 @@ function MaskPanel({
             event.target.files && onMaskFile(event.target.files)
           }
         />
+        <input
+          ref={colorRef}
+          className="mask-color-native"
+          type="color"
+          value={maskColor}
+          onChange={(event) => onMaskColorChange(event.target.value)}
+        />
       </div>
-      <div className="mask-canvas-wrap">
+      <div
+        className="mask-canvas-wrap"
+        onDragStart={(event) => event.preventDefault()}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => event.preventDefault()}
+      >
         {baseImage ? (
           <>
-            <img src={baseImage.dataUrl} alt="" />
+            <img src={baseImage.dataUrl} alt="" draggable={false} />
             <canvas
               ref={canvasRef}
               onPointerDown={(event) => {
+                event.preventDefault();
                 drawingRef.current = true;
                 (event.target as HTMLCanvasElement).setPointerCapture(
                   event.pointerId,
@@ -1537,6 +1684,7 @@ function MaskPanel({
               }}
               onPointerMove={draw}
               onPointerUp={(event) => {
+                event.preventDefault();
                 drawingRef.current = false;
                 (event.target as HTMLCanvasElement).releasePointerCapture(
                   event.pointerId,
@@ -1545,8 +1693,23 @@ function MaskPanel({
               }}
               onPointerLeave={() => {
                 drawingRef.current = false;
+                setBrushPreview(null);
               }}
+              onPointerEnter={updateBrushPreview}
+              onDragStart={(event) => event.preventDefault()}
             />
+            {brushPreview && (
+              <div
+                className="mask-brush-preview"
+                style={{
+                  top: `${brushPreview.y}px`,
+                  left: `${brushPreview.x}px`,
+                  width: `${brushPreview.size * 2}px`,
+                  height: `${brushPreview.size * 2}px`,
+                  backgroundColor: hexToRgba(maskColor, 0.35),
+                }}
+              />
+            )}
           </>
         ) : (
           <p>{t("message.addInputFirst")}</p>
@@ -1977,7 +2140,10 @@ async function buildApiMaskFromUiMask(
   };
 }
 
-async function buildUiMaskFromApiMask(asset: ImageAsset): Promise<ImageAsset> {
+async function buildUiMaskFromApiMask(
+  asset: ImageAsset,
+  maskColor: string,
+): Promise<ImageAsset> {
   const image = await loadImageElement(asset.dataUrl);
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, image.naturalWidth || image.width);
@@ -1989,11 +2155,12 @@ async function buildUiMaskFromApiMask(asset: ImageAsset): Promise<ImageAsset> {
   context.drawImage(image, 0, 0, canvas.width, canvas.height);
   const source = context.getImageData(0, 0, canvas.width, canvas.height);
   const output = context.createImageData(canvas.width, canvas.height);
+  const color = hexToRgb(maskColor);
   for (let index = 0; index < source.data.length; index += 4) {
     const painted = source.data[index + 3] === 0;
-    output.data[index] = 255;
-    output.data[index + 1] = 0;
-    output.data[index + 2] = 0;
+    output.data[index] = color.r;
+    output.data[index + 1] = color.g;
+    output.data[index + 2] = color.b;
     output.data[index + 3] = painted ? 255 : 0;
   }
   context.putImageData(output, 0, 0);
@@ -2008,6 +2175,47 @@ async function buildUiMaskFromApiMask(asset: ImageAsset): Promise<ImageAsset> {
     width: canvas.width,
     height: canvas.height,
   };
+}
+
+function drawMaskImageWithColor(
+  context: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  width: number,
+  height: number,
+  maskColor: string,
+) {
+  const sourceCanvas = document.createElement("canvas");
+  sourceCanvas.width = width;
+  sourceCanvas.height = height;
+  const sourceContext = sourceCanvas.getContext("2d");
+  if (!sourceContext) {
+    return;
+  }
+  sourceContext.drawImage(image, 0, 0, width, height);
+  const source = sourceContext.getImageData(0, 0, width, height);
+  const output = context.createImageData(width, height);
+  const color = hexToRgb(maskColor);
+  for (let index = 0; index < source.data.length; index += 4) {
+    output.data[index] = color.r;
+    output.data[index + 1] = color.g;
+    output.data[index + 2] = color.b;
+    output.data[index + 3] = source.data[index + 3];
+  }
+  context.putImageData(output, 0, 0);
+}
+
+function hexToRgb(value: string) {
+  const normalized = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#ff0000";
+  return {
+    r: Number.parseInt(normalized.slice(1, 3), 16),
+    g: Number.parseInt(normalized.slice(3, 5), 16),
+    b: Number.parseInt(normalized.slice(5, 7), 16),
+  };
+}
+
+function hexToRgba(value: string, alpha: number) {
+  const color = hexToRgb(value);
+  return `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
 }
 
 async function centerCropAssetToCanvas(
@@ -2139,13 +2347,6 @@ function withTimeout<T>(
 function stripHistoryItemForStorage(item: HistoryItem): HistoryItem {
   return {
     ...item,
-    settings: {
-      ...item.settings,
-      inputImages: item.settings.inputImages.map(stripImageAssetData),
-      maskImage: item.settings.maskImage
-        ? stripImageAssetData(item.settings.maskImage)
-        : null,
-    },
     images: item.images.map((image) => ({ ...image, dataUrl: "" })),
   };
 }
@@ -2177,13 +2378,6 @@ function normalizeStoredHistoryItem(
       ...image,
       dataUrl: image.dataUrl ?? "",
     })),
-  };
-}
-
-function stripImageAssetData(image: ImageAsset): ImageAsset {
-  return {
-    ...image,
-    dataUrl: "",
   };
 }
 

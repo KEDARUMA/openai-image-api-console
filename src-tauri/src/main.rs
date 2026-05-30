@@ -219,6 +219,10 @@ fn read_json_file(path: &Path, label: &str) -> Result<Value, String> {
     serde_json::from_str(&text).map_err(|error| format!("{label} の JSON 形式が不正です: {error}"))
 }
 
+fn read_json_text(text: &str, label: &str) -> Result<Value, String> {
+    serde_json::from_str(text).map_err(|error| format!("{label} の JSON 形式が不正です: {error}"))
+}
+
 fn load_app_config_value() -> Result<Value, String> {
     ensure_default_config_files()?;
     read_json_file(&config_dir()?.join("app-config.json"), "app-config.json")
@@ -246,7 +250,24 @@ fn load_locale_value(language: &str) -> Result<Value, String> {
     } else {
         locale_dir.join("en.json")
     };
-    read_json_file(&path, &format!("locale {}", path.to_string_lossy()))
+    let default_text = if code == "ja" {
+        DEFAULT_LOCALE_JA
+    } else {
+        DEFAULT_LOCALE_EN
+    };
+    let mut default_locale = read_json_text(default_text, &format!("default locale {code}"))?;
+    let user_locale = read_json_file(&path, &format!("locale {}", path.to_string_lossy()))?;
+    merge_json_objects(&mut default_locale, user_locale);
+    Ok(default_locale)
+}
+
+fn merge_json_objects(base: &mut Value, overlay: Value) {
+    let (Some(base_map), Some(overlay_map)) = (base.as_object_mut(), overlay.as_object()) else {
+        return;
+    };
+    for (key, value) in overlay_map {
+        base_map.insert(key.clone(), value.clone());
+    }
 }
 
 fn list_available_locales() -> Result<Vec<LocaleInfo>, String> {
@@ -337,6 +358,10 @@ fn load_history() -> Result<Vec<Value>, String> {
 fn save_history(history: Vec<Value>) -> Result<(), String> {
     let path = history_path()?;
     let assets_dir = history_assets_dir()?;
+    if history.is_empty() && assets_dir.exists() {
+        fs::remove_dir_all(&assets_dir)
+            .map_err(|error| format!("履歴画像フォルダを削除できませんでした: {error}"))?;
+    }
     let sanitized = history
         .into_iter()
         .take(HISTORY_LIMIT)

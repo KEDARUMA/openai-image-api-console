@@ -11,6 +11,7 @@ use tauri::{AppHandle, Emitter, Window};
 use tokio::time::{sleep, timeout};
 
 const IMAGE_ENDPOINT: &str = "https://api.openai.com/v1/responses";
+const IMAGES_GENERATIONS_ENDPOINT: &str = "https://api.openai.com/v1/images/generations";
 const IMAGES_EDITS_ENDPOINT: &str = "https://api.openai.com/v1/images/edits";
 const HISTORY_LIMIT: usize = 100;
 const APP_DIR_NAME: &str = "OpenAI Image API Console";
@@ -61,6 +62,13 @@ struct ImageInfo {
     width: u32,
     height: u32,
     has_alpha: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ImageRequestBackend {
+    Responses,
+    ImagesGenerations,
+    ImagesEdits,
 }
 
 #[derive(Debug, Serialize)]
@@ -143,6 +151,22 @@ fn output_dir() -> Result<PathBuf, String> {
     fs::create_dir_all(&dir)
         .map_err(|error| format!("画像保存フォルダを作成できませんでした: {error}"))?;
     Ok(dir)
+}
+
+fn image_request_backend(request: &GenerateRequest) -> ImageRequestBackend {
+    if !uses_images_api_model(&request.model) {
+        return ImageRequestBackend::Responses;
+    }
+
+    match request.mode.as_str() {
+        "text" => ImageRequestBackend::ImagesGenerations,
+        "image" | "edit-mask" => ImageRequestBackend::ImagesEdits,
+        _ => ImageRequestBackend::Responses,
+    }
+}
+
+fn uses_images_api_model(model: &str) -> bool {
+    model.starts_with("gpt-image-") || model == "chatgpt-image-latest"
 }
 
 fn app_data_dir() -> Result<PathBuf, String> {
@@ -662,28 +686,67 @@ async fn generate_image(
         .timeout(Duration::from_secs(OPENAI_REQUEST_TIMEOUT_SECS))
         .build()
         .map_err(|error| format!("HTTP client を作成できませんでした: {error}"))?;
+    let backend = image_request_backend(&request);
     let mut images = Vec::new();
     if request.mode == "edit-mask" {
         validate_edit_mask_assets(&window, &request, &mut logs)?;
-        push_log(
-            &window,
-            &mut logs,
-            "backend: file upload skipped; using images edits multipart".to_string(),
-        );
-    } else {
-        push_log(
-            &window,
-            &mut logs,
-            "backend: file upload skipped".to_string(),
-        );
+    }
+
+    match backend {
+        ImageRequestBackend::ImagesGenerations => {
+            push_log(
+                &window,
+                &mut logs,
+                "backend: file upload skipped; using images generations".to_string(),
+            );
+        }
+        ImageRequestBackend::ImagesEdits => {
+            push_log(
+                &window,
+                &mut logs,
+                "backend: file upload skipped; using images edits multipart".to_string(),
+            );
+        }
+        ImageRequestBackend::Responses => {
+            push_log(
+                &window,
+                &mut logs,
+                "backend: file upload skipped; using responses".to_string(),
+            );
+        }
     }
     let delay_ms = request_delay_ms()?;
 
     for index in 0..count {
         emit_progress(&window, index + 1, count);
         let request_timeout = Duration::from_secs(OPENAI_REQUEST_TIMEOUT_SECS);
-        let base64 = if request.mode == "edit-mask" {
-            match timeout(
+        let base64 = match backend {
+            ImageRequestBackend::ImagesGenerations => match timeout(
+                request_timeout,
+                request_images_generation_base64(
+                    &window, &client, api_key, &request, index, count, &mut logs,
+                ),
+            )
+            .await
+            {
+                Ok(result) => result?,
+                Err(_) => {
+                    let message = format!(
+                        "OpenAI Images Generations API timeout after {}s",
+                        OPENAI_REQUEST_TIMEOUT_SECS
+                    );
+                    push_log(
+                        &window,
+                        &mut logs,
+                        format!(
+                            "backend: images generations timeout after {}s",
+                            OPENAI_REQUEST_TIMEOUT_SECS
+                        ),
+                    );
+                    return Err(format!("{message}\n\nDebug logs:\n{}", logs.join("\n")));
+                }
+            },
+            ImageRequestBackend::ImagesEdits => match timeout(
                 request_timeout,
                 request_images_edit_base64(
                     &window, &client, api_key, &request, index, count, &mut logs,
@@ -707,9 +770,8 @@ async fn generate_image(
                     );
                     return Err(format!("{message}\n\nDebug logs:\n{}", logs.join("\n")));
                 }
-            }
-        } else {
-            match timeout(
+            },
+            ImageRequestBackend::Responses => match timeout(
                 request_timeout,
                 request_responses_base64(
                     &window, &client, api_key, &request, index, count, &mut logs,
@@ -733,7 +795,7 @@ async fn generate_image(
                     );
                     return Err(format!("{message}\n\nDebug logs:\n{}", logs.join("\n")));
                 }
-            }
+            },
         };
         let mut bytes = BASE64_STANDARD
             .decode(base64.as_bytes())
@@ -892,6 +954,84 @@ async fn request_responses_base64(
     image_base64_from_response(window, logs, &data)
 }
 
+async fn request_images_generation_base64(
+    window: &Window,
+    client: &reqwest::Client,
+    api_key: &str,
+    request: &GenerateRequest,
+    index: u8,
+    count: u8,
+    logs: &mut Vec<String>,
+) -> Result<String, String> {
+    push_log(
+        window,
+        logs,
+        format!(
+            "backend: images generations request {}/{} start",
+            index + 1,
+            count
+        ),
+    );
+    let body = build_images_generation_body(request);
+    push_log(
+        window,
+        logs,
+        format!(
+            "backend: images generations endpoint=/v1/images/generations model={} size={} quality={} format={}",
+            request.model, request.size, request.quality, request.output_format
+        ),
+    );
+    push_log(
+        window,
+        logs,
+        format!(
+            "backend: images generations request json={}",
+            summarize_images_generation_body(&body)
+        ),
+    );
+
+    let response = client
+        .post(IMAGES_GENERATIONS_ENDPOINT)
+        .bearer_auth(api_key)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|error| format!("OpenAI Images Generations API に接続できませんでした: {error}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_else(|_| String::new());
+        push_log(
+            window,
+            logs,
+            format!("backend: images generations error status={status} body={text}"),
+        );
+        return Err(format!(
+            "{}\n\nDebug logs:\n{}",
+            format!("OpenAI Images Generations API error {status}: {text}"),
+            logs.join("\n")
+        ));
+    }
+
+    push_log(
+        window,
+        logs,
+        format!("backend: images generations status={}", response.status()),
+    );
+    let data: Value = response.json().await.map_err(|error| {
+        format!("OpenAI Images Generations API のレスポンスを解析できませんでした: {error}")
+    })?;
+    push_log(
+        window,
+        logs,
+        format!(
+            "backend: images generations json summary={}",
+            summarize_response_json(&data)
+        ),
+    );
+    image_base64_from_response(window, logs, &data)
+}
+
 async fn request_images_edit_base64(
     window: &Window,
     client: &reqwest::Client,
@@ -930,7 +1070,6 @@ async fn request_images_edit_base64(
             summarize_images_edits_fields(request)
         ),
     );
-
     let form = build_images_edits_form(request)?;
     let response = client
         .post(IMAGES_EDITS_ENDPOINT)
@@ -1003,15 +1142,18 @@ fn build_images_edits_form(request: &GenerateRequest) -> Result<reqwest::multipa
     if request.input_images.is_empty() {
         return Err("入力画像を追加してください。".to_string());
     }
-    let mask_image = request
-        .mask_image
-        .as_ref()
-        .ok_or("マスク画像を追加してください。".to_string())?;
 
     let mut form = reqwest::multipart::Form::new()
         .text("model", request.model.clone())
-        .text("prompt", request.prompt.clone())
-        .part("mask", multipart_part_from_asset(mask_image, "マスク画像")?);
+        .text("prompt", request.prompt.clone());
+
+    if request.mode == "edit-mask" {
+        let mask_image = request
+            .mask_image
+            .as_ref()
+            .ok_or("マスク画像を追加してください。".to_string())?;
+        form = form.part("mask", multipart_part_from_asset(mask_image, "マスク画像")?);
+    }
 
     for image in &request.input_images {
         form = form.part("image[]", multipart_part_from_asset(image, "入力画像")?);
@@ -1030,6 +1172,35 @@ fn build_images_edits_form(request: &GenerateRequest) -> Result<reqwest::multipa
     }
 
     Ok(form)
+}
+
+fn build_images_generation_body(request: &GenerateRequest) -> Value {
+    let mut body = Map::new();
+    body.insert("model".to_string(), json!(request.model));
+    body.insert("prompt".to_string(), json!(request.prompt));
+    insert_if_not_auto(&mut body, "size", &request.size);
+    insert_if_not_auto(&mut body, "quality", &request.quality);
+    insert_if_not_auto(&mut body, "output_format", &request.output_format);
+    insert_if_not_auto(&mut body, "background", &request.background);
+    insert_if_not_auto(&mut body, "moderation", &request.moderation);
+    if matches!(request.output_format.as_str(), "jpeg" | "webp") {
+        body.insert(
+            "output_compression".to_string(),
+            json!(request.output_compression.clamp(0, 100)),
+        );
+    }
+    Value::Object(body)
+}
+
+fn summarize_images_generation_body(body: &Value) -> String {
+    match body {
+        Value::Object(map) => {
+            let mut keys = map.keys().cloned().collect::<Vec<_>>();
+            keys.sort();
+            keys.join(",")
+        }
+        _ => "unknown".to_string(),
+    }
 }
 
 fn multipart_part_from_asset(
@@ -1058,7 +1229,10 @@ fn add_multipart_text_if_not_auto(
 }
 
 fn summarize_images_edits_fields(request: &GenerateRequest) -> String {
-    let mut fields = vec!["model", "prompt", "image[]", "mask"];
+    let mut fields = vec!["model", "prompt", "image[]"];
+    if request.mode == "edit-mask" {
+        fields.push("mask");
+    }
     if request.size != "auto" {
         fields.push("size");
     }

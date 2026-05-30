@@ -41,7 +41,7 @@
   "action.openApiKeys": "API Keys",
   "action.close": "Close",
   "action.save": "Save",
-  "action.createBlankCanvas": "Blank 1024x1024",
+  "action.createBlankCanvas": "Blank Image",
   "action.loadMask": "Load Mask",
   "action.clear": "Clear",
   "empty.preview": "Generated images will appear here.",

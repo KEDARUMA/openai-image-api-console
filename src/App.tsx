@@ -176,7 +176,7 @@ const fallbackLocale: LocaleText = {
   "action.openApiKeys": "API Keys",
   "action.close": "Close",
   "action.save": "Save",
-  "action.createBlankCanvas": "Blank 1024x1024",
+  "action.createBlankCanvas": "Blank Image",
   "action.loadMask": "Load Mask",
   "action.clear": "Clear",
   "empty.preview": "Generated images will appear here.",
@@ -244,7 +244,16 @@ const fallbackAppConfig: AppConfig = {
   },
   modes: ["text", "image", "edit-mask"],
   models: [
+    { value: "gpt-image-2", label: "gpt-image-2 ($8.00 / $30.00)" },
+    { value: "gpt-image-1.5", label: "gpt-image-1.5 ($8.00 / $32.00)" },
+    { value: "gpt-image-1", label: "gpt-image-1 ($10.00 / $40.00)" },
+    { value: "gpt-image-1-mini", label: "gpt-image-1-mini ($2.50 / $8.00)" },
+    {
+      value: "chatgpt-image-latest",
+      label: "chatgpt-image-latest ($8.00 / $32.00)",
+    },
     { value: "gpt-5.5", label: "gpt-5.5 ($5.00 / $30.00)" },
+    { value: "gpt-5.4", label: "gpt-5.4 ($2.50 / $15.00)" },
     { value: "gpt-5.2", label: "gpt-5.2 ($1.75 / $14.00)" },
     { value: "gpt-5.4-mini", label: "gpt-5.4-mini ($0.75 / $4.50)" },
     { value: "gpt-5.4-nano", label: "gpt-5.4-nano ($0.20 / $1.25)" },
@@ -259,6 +268,12 @@ const fallbackAppConfig: AppConfig = {
       value: "chatgpt-image-latest",
       label: "chatgpt-image-latest ($8.00 / $32.00)",
     },
+    { value: "gpt-5.5", label: "gpt-5.5 ($5.00 / $30.00)" },
+    { value: "gpt-5.4", label: "gpt-5.4 ($2.50 / $15.00)" },
+    { value: "gpt-5.2", label: "gpt-5.2 ($1.75 / $14.00)" },
+    { value: "gpt-5.4-mini", label: "gpt-5.4-mini ($0.75 / $4.50)" },
+    { value: "gpt-5.4-nano", label: "gpt-5.4-nano ($0.20 / $1.25)" },
+    { value: "gpt-5-nano", label: "gpt-5-nano ($0.05 / $0.40)" },
   ],
   sizes: ["auto", "1024x1024", "1024x1536", "1536x1024"],
   qualities: ["auto", "low", "medium", "high"],
@@ -568,6 +583,17 @@ function App() {
     const canvas = document.createElement("canvas");
     canvas.width = 1024;
     canvas.height = 1024;
+    const context = canvas.getContext("2d");
+    if (context) {
+      const imageData = context.createImageData(canvas.width, canvas.height);
+      for (let index = 0; index < imageData.data.length; index += 4) {
+        imageData.data[index] = 255;
+        imageData.data[index + 1] = 255;
+        imageData.data[index + 2] = 255;
+        imageData.data[index + 3] = 0;
+      }
+      context.putImageData(imageData, 0, 0);
+    }
 
     setForm((current) => {
       if (current.inputImages.length > 0) {
@@ -2209,7 +2235,19 @@ function extractDebugLogs(errorText: string) {
 }
 
 function buildFrontendRequestPreview(form: GenerateForm) {
-  if (form.mode === "edit-mask") {
+  const usesImagesApi = usesImagesApiModel(form.model);
+
+  if (usesImagesApi && form.mode === "text") {
+    const body: Record<string, unknown> = {
+      endpoint: "/v1/images/generations",
+      model: form.model,
+      prompt: form.prompt,
+    };
+    addImageApiOptions(body, form);
+    return JSON.stringify(body, null, 2);
+  }
+
+  if (usesImagesApi && (form.mode === "image" || form.mode === "edit-mask")) {
     const fields: Record<string, unknown> = {
       endpoint: "/v1/images/edits",
       contentType: "multipart/form-data",
@@ -2219,31 +2257,16 @@ function buildFrontendRequestPreview(form: GenerateForm) {
         name: image.name,
         media_type: image.mimeType,
       })),
-      mask: form.maskImage
+    };
+    if (form.mode === "edit-mask") {
+      fields.mask = form.maskImage
         ? {
             name: form.maskImage.name,
             media_type: form.maskImage.mimeType,
           }
-        : null,
-    };
-    if (form.size !== "auto") {
-      fields.size = form.size;
+        : null;
     }
-    if (form.quality !== "auto") {
-      fields.quality = form.quality;
-    }
-    if (form.outputFormat !== "auto") {
-      fields.output_format = form.outputFormat;
-    }
-    if (form.background !== "auto") {
-      fields.background = form.background;
-    }
-    if (form.moderation !== "auto") {
-      fields.moderation = form.moderation;
-    }
-    if (form.outputFormat === "jpeg" || form.outputFormat === "webp") {
-      fields.output_compression = form.outputCompression;
-    }
+    addImageApiOptions(fields, form);
 
     return JSON.stringify(fields, null, 2);
   }
@@ -2306,6 +2329,31 @@ function buildFrontendRequestPreview(form: GenerateForm) {
   body.tool_choice = { type: "image_generation" };
 
   return JSON.stringify(body, null, 2);
+}
+
+function addImageApiOptions(target: Record<string, unknown>, form: GenerateForm) {
+  if (form.size !== "auto") {
+    target.size = form.size;
+  }
+  if (form.quality !== "auto") {
+    target.quality = form.quality;
+  }
+  if (form.outputFormat !== "auto") {
+    target.output_format = form.outputFormat;
+  }
+  if (form.background !== "auto") {
+    target.background = form.background;
+  }
+  if (form.moderation !== "auto") {
+    target.moderation = form.moderation;
+  }
+  if (form.outputFormat === "jpeg" || form.outputFormat === "webp") {
+    target.output_compression = form.outputCompression;
+  }
+}
+
+function usesImagesApiModel(model: string) {
+  return model.startsWith("gpt-image-") || model === "chatgpt-image-latest";
 }
 
 function redactDataUrl(value: string) {

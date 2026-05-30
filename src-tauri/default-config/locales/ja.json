@@ -41,7 +41,7 @@
   "action.openApiKeys": "APIキー作成",
   "action.close": "閉じる",
   "action.save": "保存",
-  "action.createBlankCanvas": "空 1024x1024",
+  "action.createBlankCanvas": "Blank Image",
   "action.loadMask": "マスク読込",
   "action.clear": "クリア",
   "empty.preview": "生成後の画像がここに表示されます。",

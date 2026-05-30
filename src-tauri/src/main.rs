@@ -1262,7 +1262,19 @@ fn build_request_body(request: &GenerateRequest) -> Value {
     insert_if_not_auto(&mut tool, "background", &request.background);
     insert_if_not_auto(&mut tool, "size", &request.size);
     insert_if_not_auto(&mut tool, "moderation", &request.moderation);
-    insert_if_not_auto(&mut tool, "action", &request.action);
+    if request.mode == "edit-mask" {
+        tool.insert("action".to_string(), json!("edit"));
+        if let Some(mask_image) = request.mask_image.as_ref() {
+            tool.insert(
+                "input_image_mask".to_string(),
+                json!({
+                    "image_url": mask_image.data_url
+                }),
+            );
+        }
+    } else {
+        insert_if_not_auto(&mut tool, "action", &request.action);
+    }
 
     if matches!(request.output_format.as_str(), "jpeg" | "webp") {
         tool.insert(

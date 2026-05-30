@@ -1849,30 +1849,36 @@ async function prepareRequestForm(
     return { form, logs: [] };
   }
 
-  const target = parseOutputSize(form.size);
-  if (!target) {
+  const outputSize = parseOutputSize(form.size);
+  const inputSizes = await Promise.all(form.inputImages.map(imageAssetSize));
+  const firstInputSize = inputSizes[0];
+  if (!firstInputSize) {
     return {
       form,
-      logs: [`frontend: edit-mask normalization skipped size=${form.size}`],
+      logs: ["frontend: edit-mask normalization skipped input_images=0"],
     };
   }
+  const target = outputSize ?? firstInputSize;
 
-  const inputSizes = await Promise.all(form.inputImages.map(imageAssetSize));
   const maskSize = await imageAssetSize(form.maskImage);
-  const inputImages = await Promise.all(
-    form.inputImages.map((image, index) =>
-      centerCropAssetToPng(
-        image,
+  const inputImages = outputSize
+    ? await Promise.all(
+        form.inputImages.map((image, index) =>
+          centerCropAssetToPng(
+            image,
+            target,
+            `input-${index + 1}-${target.width}x${target.height}.png`,
+          ),
+        ),
+      )
+    : form.inputImages;
+  const maskImage = outputSize
+    ? await centerCropAssetToPng(
+        form.maskImage,
         target,
-        `input-${index + 1}-${target.width}x${target.height}.png`,
-      ),
-    ),
-  );
-  const maskImage = await centerCropAssetToPng(
-    form.maskImage,
-    target,
-    `mask-${target.width}x${target.height}.png`,
-  );
+        `mask-${target.width}x${target.height}.png`,
+      )
+    : form.maskImage;
   const apiMaskImage = await buildApiMaskFromUiMask(
     form.maskImage,
     target,
@@ -1886,7 +1892,7 @@ async function prepareRequestForm(
       maskImage: apiMaskImage,
     },
     logs: [
-      `frontend: edit-mask normalization target=${target.width}x${target.height} crop=center output_format=png`,
+      `frontend: edit-mask normalization target=${target.width}x${target.height} crop=${outputSize ? "center" : "none"} output_format=png`,
       `frontend: input_sizes_before=${inputSizes.map((size) => `${size.width}x${size.height}`).join(", ")}`,
       `frontend: mask_size_before=${maskSize.width}x${maskSize.height}`,
       `frontend: input_sizes_after=${inputImages.map((image) => `${image.width}x${image.height}`).join(", ")}`,
@@ -2290,7 +2296,16 @@ function buildFrontendRequestPreview(form: GenerateForm) {
   if (form.moderation !== "auto") {
     tool.moderation = form.moderation;
   }
-  if (form.action !== "auto") {
+  if (form.mode === "edit-mask") {
+    tool.action = "edit";
+    if (form.maskImage) {
+      tool.input_image_mask = {
+        image_url: redactDataUrl(form.maskImage.dataUrl),
+        media_type: form.maskImage.mimeType,
+        name: form.maskImage.name,
+      };
+    }
+  } else if (form.action !== "auto") {
     tool.action = form.action;
   }
   if (form.outputFormat === "jpeg" || form.outputFormat === "webp") {
@@ -2309,10 +2324,7 @@ function buildFrontendRequestPreview(form: GenerateForm) {
               },
               ...form.inputImages.map((image) => ({
                 type: "input_image",
-                image_url:
-                  form.mode === "edit-mask"
-                    ? "<uploaded input file id>"
-                    : redactDataUrl(image.dataUrl),
+                image_url: redactDataUrl(image.dataUrl),
                 media_type: image.mimeType,
                 name: image.name,
               })),

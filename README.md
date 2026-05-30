@@ -4,7 +4,7 @@ English | [日本語](README.ja.md)
 
 OpenAI Image API Console is an unofficial desktop app for using OpenAI image generation and image editing APIs.
 
-It gives you a local GUI for text-to-image generation, image-to-image generation, mask editing, transparent PNG output, model options, and generation history. It is built with Tauri, React, and Vite, and is available for macOS, Windows, and Linux.
+It can export transparent-background images with alpha channels. It also lets you generate images with 11 currently available models, including GPT Image 2. You can create images from text, generate from input images, edit with masks, adjust output settings, and review local generation history. The app is built with Tauri, React, and Vite, and is available for macOS, Windows, and Linux.
 
 ## Download
 
@@ -39,11 +39,12 @@ Choose the file that matches your OS:
 
 ## Features
 
+- Export transparent-background images with alpha channels
+- Generate images with 11 currently available models, including GPT Image 2
 - Generate images from text prompts
 - Generate images with input images
 - Edit images with mask images
 - Choose PNG, WebP, or JPEG output
-- Use transparent PNG output and alpha-channel PNG masks
 - Show approximate model pricing in the model selector
 - Save generation history locally
 - Switch between Japanese and English UI text
@@ -61,6 +62,18 @@ If you see this warning after copying the app to Applications, remove the quaran
 xattr -dr com.apple.quarantine "/Applications/OpenAI Image API Console.app"
 open "/Applications/OpenAI Image API Console.app"
 ```
+
+## Windows Notice
+
+The Windows installer is currently distributed without code signing. Microsoft Defender SmartScreen may show a warning when you launch it.
+
+<img src="docs/images/windows-smartscreen-warning.png" alt="Windows SmartScreen warning" width="50%">
+
+If you see this warning, click `More info`, then choose `Run anyway`.
+
+## If Security Warnings Make You Uncomfortable
+
+You can clone this repository and run the app locally instead of using the installer. You can use the same app features without installing a downloaded binary. See the Development and Build sections below.
 
 ## Screenshots
 

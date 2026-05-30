@@ -434,16 +434,8 @@ fn show_in_finder(path: String) -> Result<(), String> {
     if !Path::new(&path).exists() {
         return Err(format!("画像ファイルが見つかりません: {path}"));
     }
-    let status = Command::new("open")
-        .arg("-R")
-        .arg(&path)
-        .status()
-        .map_err(|error| format!("Finder を開けませんでした: {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("Finder で表示できませんでした: {path}"))
-    }
+    tauri_plugin_opener::reveal_item_in_dir(path)
+        .map_err(|error| format!("ファイルの場所を開けませんでした: {error}"))
 }
 
 #[tauri::command]
@@ -482,15 +474,8 @@ fn open_external_url(url: String) -> Result<(), String> {
     ) {
         return Err(format!("この URL は開けません: {url}"));
     }
-    let status = Command::new("open")
-        .arg(&url)
-        .status()
-        .map_err(|error| format!("URL を開けませんでした: {error}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(format!("URL を開けませんでした: {url}"))
-    }
+    tauri_plugin_opener::open_url(url, None::<&str>)
+        .map_err(|error| format!("URL を開けませんでした: {error}"))
 }
 
 fn apple_script_string(value: &str) -> String {
@@ -1973,6 +1958,7 @@ fn media_type_for_path(path: &Path) -> &'static str {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             load_settings,
             save_settings,

@@ -53,6 +53,15 @@ Choose the file that matches your OS:
 
 This app is currently distributed without Apple Developer ID signing or notarization. macOS may show a security warning the first time you open it.
 
+<img src="docs/images/macos-gatekeeper-warning.png" alt="macOS Gatekeeper warning" width="50%">
+
+If you see this warning after copying the app to Applications, remove the quarantine attribute and open the app again:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/OpenAI Image API Console.app"
+open "/Applications/OpenAI Image API Console.app"
+```
+
 ## Screenshots
 
 ### Main Screen
